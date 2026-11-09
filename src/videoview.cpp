@@ -9,6 +9,9 @@
 #include <mediastreamer2/msfactory.h>
 #include <mediastreamer2/msfilter.h>
 #include <mediastreamer2/msvideo.h>
+#ifdef STEL_LIBYUV_RGB
+#include <libyuv/convert_argb.h>
+#endif
 
 namespace stel {
 namespace {
@@ -29,21 +32,32 @@ void displayProcess(MSFilter *f) {
     auto *last=f->inputs[0]?ms_queue_peek_last(f->inputs[0]):nullptr;
     MSPicture picture{};
     if(active&&d->visible&&last&&ms_yuv_buf_init_from_mblk(&picture,last)==0&&picture.w>0&&picture.h>0) {
+#ifndef STEL_LIBYUV_RGB
         if(d->width!=picture.w||d->height!=picture.h){
             if(d->scaler)ms_scaler_context_free(d->scaler);
             d->width=picture.w;d->height=picture.h;
             d->scaler=ms_scaler_create_context(picture.w,picture.h,MS_YUV420P,picture.w,picture.h,MS_RGB24,MS_SCALER_METHOD_BILINEAR);
         }
         if(d->scaler){
+#endif
             QImage frame(picture.w,picture.h,QImage::Format_RGB888);
             if(!frame.isNull()){
+#ifdef STEL_LIBYUV_RGB
+                const int converted=libyuv::I420ToRAW(picture.planes[0],picture.strides[0],
+                    picture.planes[1],picture.strides[1],picture.planes[2],picture.strides[2],
+                    frame.bits(),int(frame.bytesPerLine()),picture.w,picture.h);
+#else
                 uint8_t *pixels[4]={frame.bits(),nullptr,nullptr,nullptr};int strides[4]={int(frame.bytesPerLine()),0,0,0};
-                if(ms_scaler_process(d->scaler,picture.planes,picture.strides,pixels,strides)>=0){
+                const int converted=ms_scaler_process(d->scaler,picture.planes,picture.strides,pixels,strides);
+#endif
+                if(converted>=0){
                     if(d->mirror&&!mblk_get_precious_flag(last))frame=frame.mirrored(true,false);
                     QMutexLocker lock(&frameMutex);if(surfaces.contains(d->surface))latestFrames[d->surface]=frame;
                 }
             }
+#ifndef STEL_LIBYUV_RGB
         }
+#endif
     }
     for(int n=0;n<2;++n)if(f->inputs[n])ms_queue_flush(f->inputs[n]);
     ms_filter_unlock(f);

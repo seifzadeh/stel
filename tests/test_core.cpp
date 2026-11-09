@@ -197,7 +197,7 @@ private slots:
     void rememberedCredentialsAndOptOut() {
         QTemporaryDir tmp;Store store(tmp.path());auto a=direct("saved");a.password="test-sip-secret";a.keyPassword="test-key-secret";a.turnPassword="test-turn-secret";
         QVERIFY(a.rememberPassword);QString error;QVERIFY2(store.save({a},{},&error),qPrintable(error));
-        QFile config(tmp.path()+"/settings.json");QVERIFY(config.open(QIODevice::ReadOnly));const auto data=config.readAll();QVERIFY(!data.contains("test-sip-secret"));QVERIFY(!data.contains("test-key-secret"));QVERIFY(!data.contains("test-turn-secret"));
+        QFile config(tmp.path()+"/settings.json");QVERIFY(config.open(QIODevice::ReadOnly));const auto data=config.readAll();config.close();QVERIFY(!data.contains("test-sip-secret"));QVERIFY(!data.contains("test-key-secret"));QVERIFY(!data.contains("test-turn-secret"));
         Store restarted(tmp.path());QVector<Account> accounts;Preferences prefs;QVERIFY2(restarted.load(accounts,prefs,&error),qPrintable(error));QCOMPARE(accounts.size(),1);
         QCOMPARE(accounts[0].password,a.password);QCOMPARE(accounts[0].keyPassword,a.keyPassword);QCOMPARE(accounts[0].turnPassword,a.turnPassword);
         accounts[0].rememberPassword=false;QVERIFY2(restarted.save(accounts,prefs,&error),qPrintable(error));
@@ -262,7 +262,10 @@ private slots:
         SipEngine a,b;QVERIFY2(a.start(p,tmp.path()+"/a",true),qPrintable(a.lastError()));
         auto *sipPorts=linphone_core_get_transports_used(a.native());QCOMPARE(linphone_transports_get_udp_port(sipPorts),p.sipUdpPort);linphone_transports_unref(sipPorts);
         QVERIFY(a.soundDevices().join(' ').contains("Dummy mic"));QVERIFY(QFileInfo(tmp.path()+"/a/dummy-camera.jpg").size()>1000);
-        Preferences q=p;q.sipUdpPort=-1;q.inputDevice=dummyMicSilence();q.mediaAddress="127.0.0.1";q.audioPortMin=12000;q.audioPortMax=12098;q.videoPortMin=13000;q.videoPortMax=13098;
+        // Both media endpoints use the selected media interface. Windows cannot
+        // route packets between its physical and loopback interfaces; signalling
+        // still uses loopback, independently from the media bind/SDP address.
+        Preferences q=p;q.sipUdpPort=-1;q.inputDevice=dummyMicSilence();q.audioPortMin=12000;q.audioPortMax=12098;q.videoPortMin=13000;q.videoPortMax=13098;
         QVERIFY2(b.start(q,tmp.path()+"/b",true),qPrintable(b.lastError()));
         QVERIFY(a.addAccount(direct("alice","srtp")));QVERIFY(b.addAccount(direct("bob","srtp")));autoAnswer(b,true);
         QUdpSocket relay;QVERIFY(relay.bind(QHostAddress(QHostAddress::LocalHost),quint16(0)));
