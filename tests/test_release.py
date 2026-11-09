@@ -7,13 +7,39 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('stel_release', ROOT / 'scripts/release.py')
 release = importlib.util.module_from_spec(spec);spec.loader.exec_module(release)
+spec = importlib.util.spec_from_file_location('stel_archives', ROOT / 'scripts/ci/fetch-source-archives.py')
+archives = importlib.util.module_from_spec(spec);spec.loader.exec_module(archives)
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_pinned_archive_integrity_before_replacement(self):
+        import io
+        commit = 'a' * 40
+        for mode in ('valid', 'wrong-checksum', 'wrong-commit'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp);sdk = root / 'sdk';sdk.mkdir();cache = root / 'cache';cache.mkdir()
+                target = sdk / 'module';target.mkdir();(target / 'old.txt').write_text('preserve on failure')
+                archive = cache / (commit + '.tar.gz')
+                with tarfile.open(archive, 'w:gz', format=tarfile.PAX_FORMAT,
+                                  pax_headers={'comment': 'b' * 40 if mode == 'wrong-commit' else commit}) as tar:
+                    directory = tarfile.TarInfo('snapshot');directory.type = tarfile.DIRTYPE;tar.addfile(directory)
+                    file = tarfile.TarInfo('snapshot/source.c');file.size = 7;tar.addfile(file, io.BytesIO(b'source!'))
+                entry = {'path': 'module', 'sdk_gitlink': 'module', 'sdk_commit': commit,
+                         'commit': commit, 'url': 'https://unused.test/source.tar.gz',
+                         'sha256': '0' * 64 if mode == 'wrong-checksum' else hashlib.sha256(archive.read_bytes()).hexdigest()}
+                with mock.patch.object(archives.subprocess, 'check_output', return_value=commit):
+                    if mode == 'valid':
+                        archives.restore(sdk, entry, cache)
+                        self.assertEqual((target / 'source.c').read_bytes(), b'source!')
+                    else:
+                        with self.assertRaises(ValueError):archives.restore(sdk, entry, cache)
+                        self.assertEqual((target / 'old.txt').read_text(), 'preserve on failure')
+
     def test_source_archive_excludes_credentials_and_build_outputs(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

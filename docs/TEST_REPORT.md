@@ -70,3 +70,12 @@ The initial [Pages run](https://github.com/seifzadeh/stel/actions/runs/426145289
 failed with a missing Pages site. Pages requires one-time repository enablement
 with build type `workflow`; GITHUB_TOKEN cannot bootstrap that setting itself.
 This is separate from the static site's build and content.
+
+The [next hosted run](https://github.com/seifzadeh/stel/actions/runs/42616888641)
+passes every Linux test, packages/audits the standalone application and collects
+150 matching dependency source packages. Pages deploys successfully. Windows
+passes tool installation but the upstream GitLab host is unreachable while
+fetching SDK submodules. The Windows source profile now uses verified mirrors
+plus SHA-256/commit-stamped upstream archive snapshots for legacy mswebrtc.
+The complete source retrieval and official SDK gitlink checks pass locally
+through the same PowerShell script's DownloadOnly mode, before the hosted retry.

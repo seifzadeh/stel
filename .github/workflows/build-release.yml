@@ -101,6 +101,7 @@ jobs:
             base-devel make perl gawk bzip2 nasm sed intltool patch
             mingw-w64-ucrt-x86_64-yasm mingw-w64-ucrt-x86_64-nasm
             mingw-w64-ucrt-x86_64-doxygen mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-gcc
       - name: Verify pinned Python and SDK build tools
         run: |
           python -c "import sys, pystache, six, mesonbuild, pefile; assert sys.version_info[:2] == (3, 11), sys.version"
@@ -115,7 +116,7 @@ jobs:
         id: dependencies
         with:
           path: C:/stel-deps
-          key: windows-v142-${{ hashFiles('packaging/dependencies.json', 'scripts/ci/windows-deps.ps1') }}
+          key: windows-v142-${{ hashFiles('packaging/dependencies.json', 'scripts/ci/windows-deps.ps1', 'scripts/ci/fetch-source-archives.py') }}
       - if: steps.dependencies.outputs.cache-hit != 'true'
         run: ./scripts/ci/windows-deps.ps1
       - run: ./scripts/ci/windows-build.ps1

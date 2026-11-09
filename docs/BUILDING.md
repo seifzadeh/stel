@@ -62,6 +62,17 @@ python scripts/ci/stage-assets.py windows
 `windows-build.ps1` uses that same location. Configure native MSVC before invoking
 these scripts. The workflow caches installed dependencies and pinned sources.
 
+The Windows profile fetches only its required SDK modules. GitLab-hosted external
+forks have verified GitHub source mirrors listed in the dependency lock file;
+each downloaded HEAD must exactly match the gitlink in the official, pinned SDK
+commit. The legacy mswebrtc module and its nested WebRTC source use cached
+upstream Git archives: fixed SHA-256 checksums and the commit ID in each archive's
+Git PAX header are verified. The snapshots also match SlackBuilds' published
+upstream archive checksums. Mirrors and caches do not select versions. Disabled Android/iOS/FFmpeg/IM modules
+are not required for this Windows profile. `-DownloadOnly -Destination <path>`
+checks the complete source retrieval path without compiling, including on Linux
+with PowerShell installed. Original upstream URLs remain in `.gitmodules`.
+
 MSYS2 tools use the maintained UCRT64 repository; application and SDK compilation
 still use MSVC v142. Qt installation reuses the explicitly selected Python 3.11
 instead of replacing it with another interpreter. A preflight checks that Python

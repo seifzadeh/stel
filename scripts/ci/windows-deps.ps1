@@ -1,23 +1,50 @@
-param([string]$Destination = 'C:/stel-deps')
+param([string]$Destination = 'C:/stel-deps', [switch]$DownloadOnly)
 $ErrorActionPreference = 'Stop'
 $Project = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $Lock = Get-Content "$Project/packaging/dependencies.json" -Raw | ConvertFrom-Json
+$Python = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'python3' }
 function Checked([scriptblock]$Command) {
     & $Command
     if ($LASTEXITCODE -ne 0) { throw "Command failed: $Command" }
 }
 function Checkout-Pinned($Dependency, [string]$Directory) {
-    Checked { git -c core.longpaths=true clone --depth 1 --branch $Dependency.version $Dependency.url $Directory }
+    if (-not (Test-Path "$Directory/.git")) {
+        Checked { git -c core.longpaths=true clone --depth 1 --branch $Dependency.version $Dependency.url $Directory }
+    }
     $Revision = (& git -C $Directory rev-parse HEAD).Trim()
     if ($LASTEXITCODE -or $Revision -ne $Dependency.commit) { throw "Dependency revision mismatch: $Directory" }
-    Checked { git -C $Directory -c core.longpaths=true submodule update --init --recursive --depth 1 --jobs 4 }
+    if ($Dependency.windows_submodules) {
+        Checked { git -C $Directory submodule init }
+        foreach ($Mirror in $Dependency.source_mirrors.PSObject.Properties) {
+            Checked { git -C $Directory config "submodule.$($Mirror.Name).url" $Mirror.Value }
+        }
+        $ArchivePaths = @($Dependency.source_archives | ForEach-Object { $_.path })
+        $Paths = @($Dependency.windows_submodules | Where-Object { $_ -notin $ArchivePaths })
+        # Keep the authoritative SDK gitlinks. Mirrors only supply the same Git
+        # objects; no branch head or alternative revision is accepted.
+        Checked { git -C $Directory -c core.longpaths=true `
+            -c 'url.https://github.com/BelledonneCommunications/.insteadOf=https://gitlab.linphone.org/BC/public/' `
+            submodule update --init --recursive --depth 1 --jobs 4 -- @Paths }
+        foreach ($Path in $Paths) {
+            $Expected = (& git -C $Directory rev-parse "HEAD:$Path").Trim()
+            if ($LASTEXITCODE) { throw "Cannot read SDK gitlink: $Path" }
+            $Actual = (& git -C "$Directory/$Path" rev-parse HEAD).Trim()
+            if ($LASTEXITCODE -or $Actual -ne $Expected) { throw "SDK submodule revision mismatch: $Path" }
+        }
+        if ($Dependency.source_archives) {
+            Checked { & $Python "$Project/scripts/ci/fetch-source-archives.py" --sdk $Directory }
+        }
+    } else {
+        Checked { git -C $Directory -c core.longpaths=true submodule update --init --recursive --depth 1 --jobs 4 }
+    }
 }
-if (-not $env:QT_ROOT_DIR) { throw 'Install Qt 5.15.2 and set QT_ROOT_DIR first' }
+if (-not $DownloadOnly -and -not $env:QT_ROOT_DIR) { throw 'Install Qt 5.15.2 and set QT_ROOT_DIR first' }
 New-Item -ItemType Directory -Force "$Destination/src" | Out-Null
 $SdkSource = "$Destination/src/linphone-sdk"
 $KeychainSource = "$Destination/src/qtkeychain"
 Checkout-Pinned $Lock.linphone_sdk $SdkSource
 Checkout-Pinned $Lock.qtkeychain $KeychainSource
+if ($DownloadOnly) { Write-Host 'Pinned dependency sources and SDK gitlinks verified.'; return }
 # Native MSVC/Python/CMake remain first; MSYS provides the SDK's shell tools.
 $env:PATH += ';C:/msys64/ucrt64/bin;C:/msys64;C:/msys64/usr/bin;C:/Program Files/7-Zip'
 $SdkBuild = "$Destination/build-sdk"

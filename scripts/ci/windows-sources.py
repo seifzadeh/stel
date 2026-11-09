@@ -29,7 +29,7 @@ for module in ('qtbase', 'qtsvg'):
 (DEST / 'sources.json').write_text(json.dumps(manifest, indent=2) + '\n')
 (DEST / 'README.txt').write_text(
     'Matching source for the Windows Stel release. Qt module tarballs are official 5.15.2 sources.\n'
-    'linphone-sdk includes every recursively pinned submodule. Revision list and build options\n'
+    'linphone-sdk includes every pinned submodule used by the Windows build profile. Revision list and build options\n'
     'are in notices/ and the accompanying Stel source archive (scripts/ci/windows-deps.ps1).\n'
     'MSVC/UCRT redistributables are Microsoft system runtime components, not GPL code.\n')
 def include(member):

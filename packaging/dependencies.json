@@ -2,9 +2,79 @@
   "linphone_sdk": {
     "url": "https://github.com/BelledonneCommunications/linphone-sdk.git",
     "version": "5.3.105",
-    "commit": "08feae77e066dbd440e25eadc7919d7a1388ca02"
+    "commit": "08feae77e066dbd440e25eadc7919d7a1388ca02",
+    "windows_submodules": [
+      "bctoolbox",
+      "ortp",
+      "bzrtp",
+      "bcg729",
+      "bcmatroska2",
+      "mediastreamer2",
+      "msopenh264",
+      "mswasapi",
+      "mswebrtc",
+      "belle-sip",
+      "belr",
+      "belcard",
+      "liblinphone",
+      "external/aom",
+      "external/bv16-floatingpoint",
+      "external/dav1d",
+      "external/decaf",
+      "external/gsm",
+      "external/libjpeg-turbo",
+      "external/libvpx",
+      "external/libxml2",
+      "external/libyuv",
+      "external/mbedtls",
+      "external/openh264",
+      "external/opus",
+      "external/speex",
+      "external/sqlite3",
+      "external/srtp",
+      "external/zlib"
+    ],
+    "source_mirrors": {
+      "external/aom": "https://github.com/a791143125-arch/external-aom.git",
+      "external/bv16-floatingpoint": "https://github.com/a791143125-arch/external-bv16-floatingpoint.git",
+      "external/dav1d": "https://github.com/a791143125-arch/external-dav1d.git",
+      "external/decaf": "https://github.com/a791143125-arch/external-decaf.git",
+      "external/gsm": "https://github.com/a791143125-arch/external-gsm.git",
+      "external/libjpeg-turbo": "https://github.com/a791143125-arch/external-libjpeg-turbo.git",
+      "external/libvpx": "https://github.com/a791143125-arch/external-libvpx.git",
+      "external/libxml2": "https://github.com/a791143125-arch/external-libxml2.git",
+      "external/libyuv": "https://github.com/a791143125-arch/external-libyuv.git",
+      "external/mbedtls": "https://github.com/a791143125-arch/external-mbedtls.git",
+      "external/openh264": "https://github.com/a791143125-arch/external-openh264.git",
+      "external/opus": "https://github.com/a791143125-arch/external-opus.git",
+      "external/speex": "https://github.com/a791143125-arch/external-speex.git",
+      "external/sqlite3": "https://github.com/a791143125-arch/external-sqlite3.git",
+      "external/srtp": "https://github.com/a791143125-arch/external-srtp.git",
+      "external/zlib": "https://github.com/a791143125-arch/external-zlib.git"
+    },
+    "source_archives": [
+      {
+        "path": "mswebrtc",
+        "commit": "9615e3eb8e3b2717b71a082b4e751f98c34d3f07",
+        "sdk_gitlink": "mswebrtc",
+        "sdk_commit": "9615e3eb8e3b2717b71a082b4e751f98c34d3f07",
+        "url": "https://slackware.uk/sbosrcarch/by-name/network/linphone-desktop/mswebrtc-9615e3eb8e3b2717b71a082b4e751f98c34d3f07.tar.gz",
+        "sha256": "f9a065256b6166301959e57ae40576e6e3a6f59fe9334c398e260d04077f66c1"
+      },
+      {
+        "path": "mswebrtc/webrtc",
+        "commit": "583acd27665cfadef8ab03eb85a768d308bd29dd",
+        "sdk_gitlink": "mswebrtc",
+        "sdk_commit": "9615e3eb8e3b2717b71a082b4e751f98c34d3f07",
+        "url": "https://slackware.uk/sbosrcarch/by-name/network/linphone-desktop/webrtc-583acd27665cfadef8ab03eb85a768d308bd29dd.tar.gz",
+        "sha256": "ef0be0696253c861e46ffef8de355777e3d91774890b982bcff6adaf2a08750f"
+      }
+    ]
   },
-  "qt": {"version": "5.15.2", "arch": "win64_msvc2019_64"},
+  "qt": {
+    "version": "5.15.2",
+    "arch": "win64_msvc2019_64"
+  },
   "qtkeychain": {
     "url": "https://github.com/frankosterfeld/qtkeychain.git",
     "version": "0.15.0",
