@@ -39,14 +39,27 @@ function Checkout-Pinned($Dependency, [string]$Directory) {
     }
 }
 if (-not $DownloadOnly -and -not $env:QT_ROOT_DIR) { throw 'Install Qt 5.15.2 and set QT_ROOT_DIR first' }
+if (-not $DownloadOnly) {
+    $MsysRoot = if ($env:STEL_MSYS2_ROOT) { $env:STEL_MSYS2_ROOT } else { 'C:/msys64' }
+    $CompilerBin = Split-Path -Parent (Get-Command cl.exe -ErrorAction Stop).Source
+    $PythonBin = Split-Path -Parent (Get-Command $Python -ErrorAction Stop).Source
+    $CmakeBin = Split-Path -Parent (Get-Command cmake.exe -ErrorAction Stop).Source
+    $NinjaBin = Split-Path -Parent (Get-Command ninja.exe -ErrorAction Stop).Source
+    # Native compiler, linker and Python precede MSYS tools. Use the action's
+    # actual location, which is normally on D: on hosted Windows runners.
+    $env:PATH = "$CompilerBin;$env:WindowsSdkVerBinPath/x64;$PythonBin;$PythonBin/Scripts;$CmakeBin;$NinjaBin;$MsysRoot/ucrt64/bin;$MsysRoot;$MsysRoot/usr/bin;$env:PATH"
+    foreach ($Tool in @('nasm.exe','yasm.exe','gcc.exe','sh.exe','msys2_shell.cmd')) {
+        $Resolved = Get-Command $Tool -ErrorAction Stop
+        Write-Host "$Tool => $($Resolved.Source)"
+    }
+}
 New-Item -ItemType Directory -Force "$Destination/src" | Out-Null
 $SdkSource = "$Destination/src/linphone-sdk"
 $KeychainSource = "$Destination/src/qtkeychain"
 Checkout-Pinned $Lock.linphone_sdk $SdkSource
 Checkout-Pinned $Lock.qtkeychain $KeychainSource
 if ($DownloadOnly) { Write-Host 'Pinned dependency sources and SDK gitlinks verified.'; return }
-# Native MSVC/Python/CMake remain first; MSYS provides the SDK's shell tools.
-$env:PATH += ';C:/msys64/ucrt64/bin;C:/msys64;C:/msys64/usr/bin;C:/Program Files/7-Zip'
+$env:PATH += ';C:/Program Files/7-Zip'
 $SdkBuild = "$Destination/build-sdk"
 Checked { cmake -S $SdkSource -B $SdkBuild -G Ninja `
     -DCMAKE_BUILD_TYPE=Release "-DCMAKE_INSTALL_PREFIX=$Destination/sdk" `

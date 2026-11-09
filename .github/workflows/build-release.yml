@@ -94,6 +94,7 @@ jobs:
           cache: true
           setup-python: false
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
+        id: msys2
         with:
           msystem: UCRT64
           update: true
@@ -118,6 +119,8 @@ jobs:
           path: C:/stel-deps
           key: windows-v142-${{ hashFiles('packaging/dependencies.json', 'scripts/ci/windows-deps.ps1', 'scripts/ci/fetch-source-archives.py') }}
       - if: steps.dependencies.outputs.cache-hit != 'true'
+        env:
+          STEL_MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
         run: ./scripts/ci/windows-deps.ps1
       - run: ./scripts/ci/windows-build.ps1
       - run: |
