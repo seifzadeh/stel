@@ -20,7 +20,7 @@ for key in list(env):
         env.pop(key, None)
 env['PATH'] = (os.pathsep.join([str(Path(env['SystemRoot']) / 'System32'), env['SystemRoot']])
                if os.name == 'nt' else '/usr/bin:/bin')
-env['QT_QPA_PLATFORM'] = 'offscreen'
+env['QT_QPA_PLATFORM'] = 'windows' if os.name == 'nt' else 'offscreen'
 env['QT_QPA_PLATFORMTHEME'] = ''
 with tempfile.TemporaryDirectory(prefix='Stel تست standalone ') as directory:
     root = Path(directory)

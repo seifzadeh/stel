@@ -162,7 +162,9 @@ jobs:
         if: always()
         with:
           name: windows-test-logs
-          path: build-windows/Testing/Temporary/*.log
+          path: |
+            build-windows/Testing/Temporary/*.log
+            build-windows/Testing/Temporary/*-qt.txt
 
   release:
     needs: [metadata, linux, windows]

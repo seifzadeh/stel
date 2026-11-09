@@ -47,10 +47,11 @@ def main():
     shutil.copy2(args.build / 'stel.exe', stage)
     subprocess.run([str(args.qt / 'bin/windeployqt.exe'), '--release', '--no-translations',
                     '--no-compiler-runtime', str(stage / 'stel.exe')], check=True)
-    runtime_roots = [args.sdk / 'bin', args.keychain / 'bin', args.crt, args.ucrt, args.qt / 'bin']
-    for directory in runtime_roots[:4]:
+    runtime_roots = [args.sdk / 'bin', args.sdk / 'lib', args.keychain / 'bin', args.crt, args.ucrt, args.qt / 'bin']
+    for directory in runtime_roots[:-1]:
         files = list(directory.glob('*.dll'))
-        if not files:
+        # Autotools-built SDK codecs (notably OpenH264) install DLLs in lib.
+        if not files and directory != args.sdk / 'lib':
             raise RuntimeError(f'Runtime DLL directory is empty: {directory}')
         for file in files:
             shutil.copy2(file, stage / file.name)
