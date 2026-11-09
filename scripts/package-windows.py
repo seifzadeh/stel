@@ -45,8 +45,26 @@ def main():
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
     shutil.copy2(args.build / 'stel.exe', stage)
-    subprocess.run([str(args.qt / 'bin/windeployqt.exe'), '--release', '--no-translations',
-                    '--no-compiler-runtime', str(stage / 'stel.exe')], check=True)
+    # Qt 5's deploy tool assumes every DLL named Qt5* lives in Qt's bin folder,
+    # including the separately installed QtKeychain. Expose its exact DLL there
+    # only while the tool scans/copies it, then restore the Qt installation.
+    aliases = []
+    try:
+        for dll in (args.keychain / 'bin').glob('*.dll'):
+            if not re.match(r'^qt\d', dll.name, re.I):
+                continue
+            alias = args.qt / 'bin' / dll.name
+            if alias.exists():
+                if alias.read_bytes() != dll.read_bytes():
+                    raise RuntimeError(f'Conflicting Qt deployment library: {alias}')
+            else:
+                shutil.copy2(dll, alias)
+                aliases.append(alias)
+        subprocess.run([str(args.qt / 'bin/windeployqt.exe'), '--release', '--no-translations',
+                        '--no-compiler-runtime', str(stage / 'stel.exe')], check=True)
+    finally:
+        for alias in aliases:
+            alias.unlink()
     runtime_roots = [args.sdk / 'bin', args.sdk / 'lib', args.keychain / 'bin', args.crt, args.ucrt, args.qt / 'bin']
     for directory in runtime_roots[:-1]:
         files = list(directory.glob('*.dll'))
