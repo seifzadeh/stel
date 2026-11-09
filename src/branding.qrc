@@ -1,0 +1,20 @@
+<RCC>
+  <qresource prefix="/branding">
+    <file alias="stel-16.png">../packaging/icons/stel-16.png</file>
+    <file alias="stel-20.png">../packaging/icons/stel-20.png</file>
+    <file alias="stel-24.png">../packaging/icons/stel-24.png</file>
+    <file alias="stel-32.png">../packaging/icons/stel-32.png</file>
+    <file alias="stel-40.png">../packaging/icons/stel-40.png</file>
+    <file alias="stel-48.png">../packaging/icons/stel-48.png</file>
+    <file alias="stel-64.png">../packaging/icons/stel-64.png</file>
+    <file alias="stel-128.png">../packaging/icons/stel-128.png</file>
+    <file alias="stel-256.png">../packaging/icons/stel-256.png</file>
+    <file alias="stel-512.png">../packaging/icons/stel-512.png</file>
+    <file alias="stel-1024.png">../packaging/icons/stel-1024.png</file>
+    <file alias="stel-wordmark.png">../packaging/stel-wordmark.png</file>
+  </qresource>
+  <qresource prefix="/licenses">
+    <file alias="GPL-3.0.txt">../LICENSE</file>
+    <file alias="AGPL-3.0.txt">../LICENSES/AGPL-3.0.txt</file>
+  </qresource>
+</RCC>

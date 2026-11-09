@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#153440">
+  <meta name="description" content="Stel is a compact, open-source SIP softphone for Linux and Windows. Multi-account voice and video calls, TLS, SRTP and practical call controls.">
+  <meta property="og:title" content="Stel — Desktop SIP softphone">
+  <meta property="og:description" content="Multi-account voice and video calling. Open source, built with Qt and liblinphone.">
+  <meta property="og:image" content="https://seifzadeh.github.io/stel/assets/main-window.png">
+  <title>Stel — Desktop SIP softphone</title>
+  <link rel="icon" href="assets/stel.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+<header class="site-header"><nav class="container" aria-label="Main navigation">
+  <a class="brand" href="#" aria-label="Stel home"><img src="assets/stel.svg" width="38" height="38" alt=""><span>Stel</span></a>
+  <div class="nav-links"><a href="#features" data-fa="امکانات">Features</a><a href="#screenshots" data-fa="تصاویر">Screenshots</a><a href="https://github.com/seifzadeh/stel" data-fa="سورس کد">Source</a><button id="language" type="button" aria-label="Switch to Persian">فارسی</button></div>
+</nav></header>
+<main>
+<section class="hero container">
+  <div class="hero-copy">
+    <p class="eyebrow" data-fa="سافت‌فون دسکتاپ · متن‌باز">DESKTOP SIP SOFTPHONE · OPEN SOURCE</p>
+    <h1 data-fa="تماس‌های SIP شما، ساده و در دسترس.">A simple home for<br>your SIP calls.</h1>
+    <p class="intro" data-fa="چند حساب، تماس صوتی و تصویری و کنترل کامل تماس؛ در یک برنامهٔ سبک با Qt و liblinphone برای لینوکس و ویندوز.">Multiple accounts, voice and video, and the call controls you need. A compact desktop app built with Qt and liblinphone for Linux and Windows.</p>
+    <div class="actions"><a class="button primary" href="https://github.com/seifzadeh/stel/releases" data-fa="دریافت Stel">Get Stel <span aria-hidden="true">↗</span></a><a class="button secondary" href="https://github.com/seifzadeh/stel" data-fa="مشاهدهٔ سورس">View source <span aria-hidden="true">→</span></a></div>
+    <div class="hero-meta"><span class="status-dot"></span><span>GPLv3</span><span class="divider">/</span><span data-fa="نسخهٔ سورس">Source version</span><span class="version">__STEL_VERSION__</span></div>
+  </div>
+  <div class="hero-visual"><div class="window-frame"><div class="window-bar"><i></i><i></i><i></i><span>Stel · desktop</span></div><img src="assets/main-window.png" width="1080" height="720" alt="Stel main window with two locally connected SIP accounts" fetchpriority="high"></div><div class="visual-note"><span class="status-dot"></span><span data-fa="دو حساب. یک محیط ساده.">Two accounts. One clear workspace.</span></div></div>
+</section>
+<section class="platforms container" aria-label="Downloads"><div><span class="eyebrow" data-fa="اجرای مستقیم">READY TO RUN</span><h2 data-fa="دریافت، کلیک، تماس.">Download. Open. Call.</h2></div><div class="platform-actions"><a class="platform" id="linux-download" href="https://github.com/seifzadeh/stel/releases"><span class="os-icon" aria-hidden="true">◈</span><span><strong>Linux</strong><small>x86_64 · .run</small></span><span aria-hidden="true">↓</span></a><a class="platform" id="windows-download" href="https://github.com/seifzadeh/stel/releases"><span class="os-icon" aria-hidden="true">⊞</span><span><strong>Windows</strong><small>x64 · portable .exe</small></span><span aria-hidden="true">↓</span></a></div><p class="download-note" data-fa="وابستگی‌های برنامه همراه باینری هستند. حداقل نسخهٔ سیستم‌عامل و وضعیت تست در یادداشت هر Release درج می‌شود.">Application libraries travel with the binary. See each release for the Linux baseline and Windows compatibility status.</p></section>
+<section class="features container" id="features">
+  <div class="section-heading"><p class="eyebrow" data-fa="ابزارهایی برای تماس روزانه">MADE FOR EVERYDAY CALLING</p><h2 data-fa="تنظیمات روشن، کنترل‌های در دسترس.">Practical controls.<br>Room to configure.</h2></div>
+  <div class="feature-grid">
+    <article><span class="feature-number">01 / ACCOUNTS</span><h3 data-fa="همهٔ حساب‌ها در کنار هم">Keep your accounts together</h3><p data-fa="افزودن و ویرایش حساب، نتیجهٔ زندهٔ رجیستر، Caller ID Name و پاسخ خودکار مستقل برای هر حساب.">Add and edit SIP accounts, see registration results immediately, and configure Caller ID Name and Auto Answer per account.</p></article>
+    <article><span class="feature-number">02 / CALLS</span><h3 data-fa="پنجره‌ای برای هر تماس">A window for every call</h3><p data-fa="تماس صوتی و تصویری، DTMF، نگه‌داشتن تماس، انتقال و کنفرانس. پیش از بستن پنجرهٔ تماس فعال از شما سؤال می‌شود.">Voice and video, DTMF, hold, transfers and conferencing. Closing an active call window asks before hanging up.</p></article>
+    <article><span class="feature-number">03 / NETWORK</span><h3 data-fa="انتخاب مسیر و امنیت تماس">Choose your connection</h3><p data-fa="SIP روی UDP، TCP و TLS با امکان گواهی کلاینت. انتخاب RTP یا SRTP، آدرس سیگنال و مدیا و محدودهٔ پورت‌ها.">SIP over UDP, TCP or TLS with optional client certificates. Choose RTP or SRTP, signalling and media addresses, and port ranges.</p></article>
+    <article><span class="feature-number">04 / TESTING</span><h3 data-fa="ابزارهایی برای تست و توسعه">Useful on the test bench</h3><p data-fa="میکروفون و دوربین مجازی، انتخاب و اولویت‌بندی کدک‌ها و تست‌های محلی تماس و TLS. قابلیت کدک‌ها به بیلد بستگی دارد.">Built-in dummy microphone and camera, codec selection and priorities, plus local call and TLS tests. Codec availability follows the build.</p></article>
+  </div>
+</section>
+<section class="screenshots" id="screenshots"><div class="container"><div class="section-heading row"><div><p class="eyebrow" data-fa="تصاویر واقعی برنامه">INSIDE THE APP</p><h2 data-fa="محیط آشنا و ساده.">A familiar desktop experience.</h2></div><span class="quiet" data-fa="برای بزرگ‌نمایی روی تصویر بزنید">Select an image to enlarge</span></div>
+  <div class="gallery">
+    <a href="assets/accounts.png" class="shot"><div class="shot-image"><img src="assets/accounts.png" loading="lazy" width="980" height="760" alt="Account settings with Caller ID Name and Auto Answer"></div><div class="shot-caption"><strong data-fa="تنظیمات حساب">Account settings</strong><span>01 ↗</span></div></a>
+    <a href="assets/call.png" class="shot"><div class="shot-image"><img src="assets/call.png" loading="lazy" width="720" height="780" alt="Connected call dialog with DTMF keypad and call controls"></div><div class="shot-caption"><strong data-fa="کنترل تماس">Call controls</strong><span>02 ↗</span></div></a>
+    <a href="assets/codecs.png" class="shot"><div class="shot-image"><img src="assets/codecs.png" loading="lazy" width="980" height="760" alt="Audio codec selection and priority settings"></div><div class="shot-caption"><strong data-fa="انتخاب کدک‌ها">Codec selection</strong><span>03 ↗</span></div></a>
+    <a href="assets/about.png" class="shot"><div class="shot-image"><img src="assets/about.png" loading="lazy" width="980" height="760" alt="About Stel with version, author, license and open-source credits"></div><div class="shot-caption"><strong data-fa="دربارهٔ Stel">About Stel</strong><span>04 ↗</span></div></a>
+  </div>
+</div></section>
+<section class="open-source container"><div><p class="eyebrow" data-fa="ساخته‌شده برای اشتراک و توسعه">FREE TO STUDY. FREE TO IMPROVE.</p><h2 data-fa="متن‌باز، با سورس در دسترس.">Open source.<br>Built in the open.</h2></div><div><p data-fa="کد اصلی Stel تحت GPLv3 یا نسخه‌های بعدی منتشر می‌شود. این برنامه با تکیه بر Qt، liblinphone و پروژه‌های متن‌باز دیگر ساخته شده است؛ مجوز آن‌ها، از جمله AGPL، حفظ می‌شود.">Stel's original code is GPLv3 or later. It builds on Qt, liblinphone and other open-source projects, whose own licenses — including AGPL — remain in place.</p><a class="text-link" href="https://github.com/seifzadeh/stel/blob/main/THIRD_PARTY.md" data-fa="کتابخانه‌ها و مجوزها ←">Components &amp; licenses →</a><a class="text-link" href="https://github.com/seifzadeh/stel/blob/main/CONTRIBUTING.md" data-fa="مشارکت در توسعه ←">Contribute to Stel →</a></div></section>
+</main>
+<footer><div class="container footer-content"><a class="brand" href="#"><img src="assets/stel.svg" width="32" height="32" alt=""><span>Stel</span></a><div><span class="quiet" data-fa="توسعه‌دهندهٔ اصلی">Principal developer</span><a href="https://github.com/seifzadeh">Mehrdad Seifzadeh</a><a href="mailto:mehrdad.seifzadeh@gmail.com">mehrdad.seifzadeh@gmail.com</a></div><div><a href="https://github.com/seifzadeh/stel">GitHub ↗</a><a href="https://github.com/seifzadeh/stel/issues" data-fa="گزارش مشکل ↗">Report an issue ↗</a><span class="quiet">© 2026 · GPL-3.0-or-later</span></div></div></footer>
+<dialog id="preview"><button type="button" id="close-preview" aria-label="Close screenshot">×</button><img alt=""><p></p></dialog>
+</body></html>

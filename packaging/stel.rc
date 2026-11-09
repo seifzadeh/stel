@@ -1,0 +1,3 @@
+// Explorer/taskbar icon for both the Qt application and the native portable EXE.
+#define IDI_STEL 101
+IDI_STEL ICON "stel.ico"

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 128 128">
+  <title>Stel</title>
+  <desc>A continuous S connecting two voices, in turquoise and ivory on midnight blue.</desc>
+  <rect width="128" height="128" rx="29" fill="#132C3B"/>
+  <path d="M90 35C82 26 70 23 58 25C44 27 35 35 35 46C35 57 47 62 64 66C81 70 93 77 93 89C93 101 81 108 66 108C51 108 39 103 31 94"
+        fill="none" stroke="#F0FAF8" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M90 35C82 26 70 23 58 25C44 27 35 35 35 46C35 57 47 62 64 66"
+        fill="none" stroke="#29CCB1" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

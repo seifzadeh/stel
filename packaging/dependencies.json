@@ -1,0 +1,13 @@
+{
+  "linphone_sdk": {
+    "url": "https://github.com/BelledonneCommunications/linphone-sdk.git",
+    "version": "5.3.105",
+    "commit": "08feae77e066dbd440e25eadc7919d7a1388ca02"
+  },
+  "qt": {"version": "5.15.2", "arch": "win64_msvc2019_64"},
+  "qtkeychain": {
+    "url": "https://github.com/frankosterfeld/qtkeychain.git",
+    "version": "0.15.0",
+    "commit": "ad7344c45a86a4f66cbafc4b081b5f7b876cb0b7"
+  }
+}

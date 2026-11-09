@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Stel
+Comment=Multi-account SIP softphone
+Exec=stel
+Icon=stel
+Categories=Network;Telephony;
+Terminal=false
+StartupWMClass=stel
