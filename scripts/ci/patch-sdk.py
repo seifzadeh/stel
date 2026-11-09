@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the documented MSVC PSA header compatibility patch to the pinned SDK."""
+"""Apply documented Windows compatibility patches to the pinned SDK."""
 import argparse
 import json
 from pathlib import Path
@@ -14,13 +14,17 @@ lock = json.loads((ROOT / 'packaging/dependencies.json').read_text())['linphone_
 actual = subprocess.check_output(['git', '-C', str(sdk), 'rev-parse', 'HEAD'], text=True).strip()
 if actual != lock['commit']:
     raise SystemExit('Refusing to patch an unexpected SDK version')
-mbed = sdk / 'external/mbedtls'
-expected = subprocess.check_output(['git', '-C', str(sdk), 'rev-parse', 'HEAD:external/mbedtls'], text=True).strip()
-if subprocess.check_output(['git', '-C', str(mbed), 'rev-parse', 'HEAD'], text=True).strip() != expected:
-    raise SystemExit('Refusing to patch an unexpected Mbed TLS revision')
-patch = ROOT / 'packaging/patches/mbedtls-msvc-psa-initializers.patch'
-reverse = subprocess.run(['git', '-C', str(mbed), 'apply', '--reverse', '--check', str(patch)], capture_output=True)
-if reverse.returncode:
-    subprocess.run(['git', '-C', str(mbed), 'apply', '--check', str(patch)], check=True)
-    subprocess.run(['git', '-C', str(mbed), 'apply', str(patch)], check=True)
-print('MSVC PSA initializer compatibility patch verified/applied')
+for module, name in (
+    ('external/mbedtls', 'mbedtls-msvc-psa-initializers.patch'),
+    ('external/libyuv', 'libyuv-install-import-library.patch'),
+):
+    source = sdk / module
+    expected = subprocess.check_output(['git', '-C', str(sdk), 'rev-parse', 'HEAD:' + module], text=True).strip()
+    if subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip() != expected:
+        raise SystemExit('Refusing to patch an unexpected revision: ' + module)
+    patch = ROOT / 'packaging/patches' / name
+    reverse = subprocess.run(['git', '-C', str(source), 'apply', '--reverse', '--check', str(patch)], capture_output=True)
+    if reverse.returncode:
+        subprocess.run(['git', '-C', str(source), 'apply', '--check', str(patch)], check=True)
+        subprocess.run(['git', '-C', str(source), 'apply', str(patch)], check=True)
+    print('SDK compatibility patch verified/applied: ' + name)
