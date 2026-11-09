@@ -53,7 +53,7 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSTEL_QT_MAJOR=5 -DSTEL_DISTRO_LINPHONE=ON -DSTEL_AV1_ADDON=ON -DSTEL_LEGACY_VIDEO_ADDON=ON
           cmake --build build --parallel 4
-          dbus-run-session -- ctest --test-dir build --output-on-failure
+          bash scripts/ci/test-linux.sh build
       - name: Package and test the standalone binary
         run: |
           python3 scripts/package-linux.py
@@ -92,14 +92,21 @@ jobs:
           version: '5.15.2'
           arch: win64_msvc2019_64
           cache: true
+          setup-python: false
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
             base-devel make perl gawk bzip2 nasm sed intltool patch
-            mingw-w64-x86_64-yasm mingw-w64-x86_64-nasm
-            mingw-w64-x86_64-doxygen mingw-w64-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-yasm mingw-w64-ucrt-x86_64-nasm
+            mingw-w64-ucrt-x86_64-doxygen mingw-w64-ucrt-x86_64-pkgconf
+      - name: Verify pinned Python and SDK build tools
+        run: |
+          python -c "import sys, pystache, six, mesonbuild, pefile; assert sys.version_info[:2] == (3, 11), sys.version"
+          if ($LASTEXITCODE) { throw 'Python toolchain was changed by a dependency action' }
+          cmake --version
+          if ($LASTEXITCODE) { throw 'CMake is missing' }
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         with:
           arch: x64

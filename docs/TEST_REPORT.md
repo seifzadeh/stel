@@ -47,3 +47,26 @@ Fully static linking is not claimed. The release guide explains the first push,
 one-time Pages setup and subsequent version bumps.
 
 Earlier account/call behavior: [0.5.3 report](TEST_REPORT_0.5.3.md).
+
+## First hosted run and CI corrections
+
+The first [build run](https://github.com/seifzadeh/stel/actions/runs/42614528864)
+compiled Linux and passed TLS, but credential tests failed because its private
+D-Bus session had no Secret Service. Windows stopped while installing the removed
+MINGW64 yasm package. Qt installation also replaced Python 3.11 with 3.15, which
+would have hidden the previously installed SDK build modules.
+
+The Linux test wrapper now creates an isolated, unlocked GNOME keyring and checks
+real store/read/delete operations before CTest. Password fallback remains disabled.
+MSYS2 tools use the maintained UCRT64 repository and Qt reuses Python 3.11. The
+loopback UI video peer uses disjoint RTP/RTCP ranges to avoid collisions between
+independent endpoints sharing the same IP; video/frame/snapshot assertions remain.
+
+All native groups pass without DISPLAY or WAYLAND_DISPLAY in this isolated
+environment: core 81.76s, UI 25.39s, TLS 10.74s; 117.90s total. Release boundary
+tests, actionlint, Bash and PowerShell syntax checks also pass.
+
+The initial [Pages run](https://github.com/seifzadeh/stel/actions/runs/42614528914)
+failed with a missing Pages site. Pages requires one-time repository enablement
+with build type `workflow`; GITHUB_TOKEN cannot bootstrap that setting itself.
+This is separate from the static site's build and content.

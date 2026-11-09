@@ -191,7 +191,10 @@ private slots:
     void videoInCallDialog() {
         QFETCH(bool,incoming);QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();p.videoDevice=stel::dummyCamera();
         stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({direct("bob")},p));stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();auto *engine=w.findChild<stel::SipEngine*>();QVERIFY(engine);
-        stel::SipEngine a;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
+        // The two independent loopback endpoints must not allocate overlapping
+        // RTP/RTCP ports; unlike real remote hosts they share this machine's IP.
+        auto peerPrefs=p;peerPrefs.audioPortMin=12000;peerPrefs.audioPortMax=12098;peerPrefs.videoPortMin=13000;peerPrefs.videoPortMax=13098;
+        stel::SipEngine a;QVERIFY(a.start(peerPrefs,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
         connect(&a,&stel::SipEngine::callChanged,&a,[&](const stel::CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,&a,[&,id=i.id]{a.answer(id,true);});});
         if(incoming){QVERIFY(a.dial("alice",uri(*engine,"bob"),true));QTRY_VERIFY_WITH_TIMEOUT(dialog(w,true),6000);auto *d=dialog(w,true);QVERIFY(button(*d,"callAnswerVideo")->isVisible());QTest::mouseClick(button(*d,"callAnswerVideo"),Qt::LeftButton);}
         else {w.findChild<QLineEdit*>("dialTarget")->setText(uri(a,"alice"));QPushButton *video=nullptr;for(auto *b:w.findChildren<QPushButton*>())if(b->text()=="Video call")video=b;QVERIFY(video);QTest::mouseClick(video,Qt::LeftButton);}

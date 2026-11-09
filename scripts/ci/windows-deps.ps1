@@ -19,7 +19,7 @@ $KeychainSource = "$Destination/src/qtkeychain"
 Checkout-Pinned $Lock.linphone_sdk $SdkSource
 Checkout-Pinned $Lock.qtkeychain $KeychainSource
 # Native MSVC/Python/CMake remain first; MSYS provides the SDK's shell tools.
-$env:PATH += ';C:/msys64/mingw64/bin;C:/msys64;C:/msys64/usr/bin;C:/Program Files/7-Zip'
+$env:PATH += ';C:/msys64/ucrt64/bin;C:/msys64;C:/msys64/usr/bin;C:/Program Files/7-Zip'
 $SdkBuild = "$Destination/build-sdk"
 Checked { cmake -S $SdkSource -B $SdkBuild -G Ninja `
     -DCMAKE_BUILD_TYPE=Release "-DCMAKE_INSTALL_PREFIX=$Destination/sdk" `

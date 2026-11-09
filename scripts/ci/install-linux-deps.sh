@@ -11,4 +11,4 @@ apt-get install -y --no-install-recommends \
   qtbase5-dev qtbase5-dev-tools libqt5svg5 qtwayland5 qtkeychain-qt5-dev \
   liblinphone-dev libmediastreamer-dev libbctoolbox-dev libbelr-dev libortp-dev \
   libbellesip-dev libaom-dev libdav1d-dev libavcodec-dev libavutil-dev libswscale-dev \
-  zlib1g-dev libsecret-1-0 dbus-x11 xvfb xauth dpkg-dev
+  zlib1g-dev libsecret-1-0 libsecret-tools gnome-keyring dbus-x11 xvfb xauth dpkg-dev

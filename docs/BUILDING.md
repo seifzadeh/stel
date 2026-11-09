@@ -16,7 +16,7 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DSTEL_QT_MAJOR=5 -DSTEL_DISTRO_LINPHONE=ON \
   -DSTEL_AV1_ADDON=ON -DSTEL_LEGACY_VIDEO_ADDON=ON
 cmake --build build --parallel 4
-QT_QPA_PLATFORM=offscreen dbus-run-session -- ctest --test-dir build --output-on-failure
+bash scripts/ci/test-linux.sh build
 python3 scripts/package-linux.py
 python3 scripts/ci/smoke-portable.py dist/Stel-linux-x86_64.run
 ```
@@ -27,6 +27,12 @@ listed OS facilities remain external. Debian 13 packages determine the Linux
 dependency versions; their exact binary/source versions are recorded in
 `share/licenses/debian-sources.json`. CI downloads the matching `.dsc`, original
 tarballs and Debian patches into the release's dependency-source archive.
+
+The test wrapper starts a private D-Bus session and an unlocked GNOME Secret
+Service in temporary XDG directories. A real `secret-tool` store/read/delete
+preflight runs before CTest, and the temporary keyring is removed afterward.
+This keeps credential-persistence tests enabled on a headless host without using
+the developer's personal keyring or enabling plaintext password fallback.
 
 The older `bootstrap-debian.sh` / `build-linux.sh` scripts also support the local
 rootless development setup. Its `.deps` directory is not part of the repository.
@@ -43,7 +49,7 @@ The automated recipe is in `.github/workflows/build-release.yml` and
 - QtKeychain 0.15.0, compiled with the same Qt and compiler ABI.
 
 Exact SDK/keychain commits are in `packaging/dependencies.json`. The Actions
-recipe installs MSYS2 build tools, selects the x64 MSVC environment, then runs:
+recipe installs MSYS2 UCRT64 build tools, selects the x64 MSVC environment, then runs:
 
 ```powershell
 ./scripts/ci/windows-deps.ps1
@@ -55,6 +61,11 @@ python scripts/ci/stage-assets.py windows
 `QT_ROOT_DIR` must point to Qt. `windows-deps.ps1` defaults to `C:/stel-deps`;
 `windows-build.ps1` uses that same location. Configure native MSVC before invoking
 these scripts. The workflow caches installed dependencies and pinned sources.
+
+MSYS2 tools use the maintained UCRT64 repository; application and SDK compilation
+still use MSVC v142. Qt installation reuses the explicitly selected Python 3.11
+instead of replacing it with another interpreter. A preflight checks that Python
+and its SDK/packaging modules remain available after dependency actions.
 
 The packager runs `windeployqt`, includes SDK/keychain DLLs, plugin/resource files,
 MSVC CRT and Universal CRT redistributables, audits normal/delay PE imports with
