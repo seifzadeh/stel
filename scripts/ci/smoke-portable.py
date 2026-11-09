@@ -18,8 +18,13 @@ env = os.environ.copy()
 for key in list(env):
     if key.startswith(('STEL_', 'QT_')) or key in ('LD_LIBRARY_PATH', 'QTDIR', 'CMAKE_PREFIX_PATH'):
         env.pop(key, None)
-env['PATH'] = (os.pathsep.join([str(Path(env['SystemRoot']) / 'System32'), env['SystemRoot']])
-               if os.name == 'nt' else '/usr/bin:/bin')
+if os.name == 'nt':
+    # os.environ handles Windows' case-insensitive keys; its plain dict copy
+    # contains SYSTEMROOT and cannot be indexed with the spelling SystemRoot.
+    system_root = os.environ['SystemRoot']
+    env['PATH'] = os.pathsep.join([str(Path(system_root) / 'System32'), system_root])
+else:
+    env['PATH'] = '/usr/bin:/bin'
 env['QT_QPA_PLATFORM'] = 'windows' if os.name == 'nt' else 'offscreen'
 env['QT_QPA_PLATFORMTHEME'] = ''
 with tempfile.TemporaryDirectory(prefix='Stel تست standalone ') as directory:

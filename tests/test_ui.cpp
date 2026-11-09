@@ -1,3 +1,4 @@
+#include "isolatedsipengine.h"
 #include "mainwindow.h"
 #include "calldialog.h"
 #include "settingswidget.h"
@@ -52,6 +53,7 @@ class UiTests:public QObject {
         else d.grab().save(directory+"/"+name+".png");
     }
 private slots:
+    void init(){IsolatedSipEngine::resetPortPools();}
     void aboutShowsReleaseAndCredits() {
         QTemporaryDir tmp;stel::MainWindow window(tmp.path());QVERIFY(window.ready());window.show();window.showSettings();
         auto *pages=window.findChild<QTabWidget*>("settingsPages");QVERIFY(pages);auto *page=window.findChild<QWidget*>("aboutPage");QVERIFY(page);
@@ -90,10 +92,13 @@ private slots:
                 QVERIFY(in->findChild<QWidget*>("callRemoteVideo")->winId()!=out->findChild<QWidget*>("callRemoteVideo")->winId());
             }
             captureCall(*out,video?"call-two-accounts-video":"call-connected");screenshot(window,"two-accounts-connected");
-            QTest::mouseClick(UiTests::button(*out,"callMute"),Qt::LeftButton);QVERIFY(out->callInfo().muted);QVERIFY(!in->callInfo().muted);
-            QTest::mouseClick(UiTests::button(*out,"callMute"),Qt::LeftButton);QVERIFY(!out->callInfo().muted);
+            // ICE's late re-INVITE can temporarily disable controls after the
+            // first video frame. Activate the button once negotiation settles.
+            auto *mute=UiTests::button(*out,"callMute");QTRY_VERIFY_WITH_TIMEOUT(running()&&mute->isEnabled(),6000);
+            mute->click();QTRY_VERIFY_WITH_TIMEOUT(out->callInfo().muted,3000);QVERIFY(!in->callInfo().muted);
+            QTRY_VERIFY_WITH_TIMEOUT(running()&&mute->isEnabled(),6000);mute->click();QTRY_VERIFY_WITH_TIMEOUT(!out->callInfo().muted,3000);
             bool asked=false;QTimer::singleShot(0,out,[&]{auto *q=out->findChild<QMessageBox*>("confirmCloseCall");QVERIFY(q);asked=true;QCOMPARE(q->defaultButton(),q->button(QMessageBox::No));out->reject();QVERIFY(q->isVisible());screenshot(*q,"confirm-close-call");q->button(QMessageBox::No)->click();});
-            QVERIFY(!out->close());QVERIFY(asked);QVERIFY(out->isVisible());QVERIFY(window.isVisible());QVERIFY(running());
+            QVERIFY(!out->close());QVERIFY(asked);QVERIFY(out->isVisible());QVERIFY(window.isVisible());QTRY_VERIFY_WITH_TIMEOUT(running(),6000);
             QPointer<stel::CallDialog> closed=out;asked=false;QTimer::singleShot(0,out,[&]{auto *q=out->findChild<QMessageBox*>("confirmCloseCall");QVERIFY(q);asked=true;q->button(QMessageBox::Yes)->click();});
             QVERIFY(out->close());QVERIFY(asked);QVERIFY(!closed||!closed->isVisible());QTRY_COMPARE_WITH_TIMEOUT(calls->count(),0,6000);
             QCOMPARE(store.history().size(),2);for(const auto &entry:store.history())QVERIFY(entry["state"].toString()!="LinphoneCallReleased");
@@ -110,7 +115,7 @@ private slots:
     }
     void closeCallConfirmation(){
         QFETCH(QString,state);QFETCH(QString,trigger);QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({direct("bob")},p));
-        stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();auto *e=w.findChild<stel::SipEngine*>();stel::SipEngine a;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
+        stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();auto *e=w.findChild<stel::SipEngine*>();IsolatedSipEngine a;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
         if(state!="incoming"&&state!="outgoing")connect(&a,&stel::SipEngine::callChanged,&a,[&](const stel::CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,&a,[&,id=i.id]{a.answer(id,false);});});
         if(state=="incoming")QVERIFY(a.dial("alice",uri(*e,"bob")));else QVERIFY(e->dial("bob",uri(a,"alice")));
         QTRY_VERIFY_WITH_TIMEOUT(dialog(w,state=="incoming"),6000);QPointer<stel::CallDialog> d=dialog(w,state=="incoming");
@@ -125,14 +130,14 @@ private slots:
     }
     void peerEndsCallWhileCloseQuestionIsOpen(){
         QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({direct("bob")},p));
-        stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();auto *e=w.findChild<stel::SipEngine*>();stel::SipEngine a;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
+        stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();auto *e=w.findChild<stel::SipEngine*>();IsolatedSipEngine a;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
         connect(&a,&stel::SipEngine::callChanged,&a,[&](const stel::CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,&a,[&,id=i.id]{a.answer(id,false);});});
         QVERIFY(e->dial("bob",uri(a,"alice")));QTRY_VERIFY_WITH_TIMEOUT(streams(a)&&streams(*e),6000);QPointer<stel::CallDialog> d=dialog(w,false);QVERIFY(d);bool asked=false;
         QTimer::singleShot(0,d,[&]{auto *q=d->findChild<QMessageBox*>("confirmCloseCall");QVERIFY(q);asked=true;QTimer::singleShot(30,&a,[&]{for(const auto &i:a.calls())a.hangup(i.id);});});
         QVERIFY(d->close());QVERIFY(asked);QVERIFY(!d||!d->isVisible());QTRY_VERIFY_WITH_TIMEOUT(e->calls().isEmpty()&&a.calls().isEmpty(),6000);QVERIFY(w.isVisible());
     }
     void endedCallClosesWithoutQuestion(){
-        QTemporaryDir tmp;stel::SipEngine e;QVERIFY(e.start({},tmp.path(),true));stel::CallInfo info;info.id="ended";info.rawState=LinphoneCallEnd;stel::CallDialog d(e,info);d.setAttribute(Qt::WA_DeleteOnClose,false);d.show();
+        QTemporaryDir tmp;IsolatedSipEngine e;QVERIFY(e.start({},tmp.path(),true));stel::CallInfo info;info.id="ended";info.rawState=LinphoneCallEnd;stel::CallDialog d(e,info);d.setAttribute(Qt::WA_DeleteOnClose,false);d.show();
         bool asked=false;QTimer::singleShot(0,&d,[&]{if(auto *q=d.findChild<QMessageBox*>("confirmCloseCall")){asked=true;q->button(QMessageBox::No)->click();}});
         QVERIFY(d.close());QTest::qWait(30);QVERIFY(!asked);QVERIFY(!d.isVisible());
     }
@@ -143,7 +148,7 @@ private slots:
     void incomingCallActions() {
         QFETCH(QString,action);QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();
         stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({direct("bob")},p));stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();
-        auto *engine=w.findChild<stel::SipEngine*>();QVERIFY(engine);stel::SipEngine a,c;
+        auto *engine=w.findChild<stel::SipEngine*>();QVERIFY(engine);IsolatedSipEngine a,c;
         QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(c.start(p,tmp.path()+"/c",true));auto alice=direct("alice");alice.label="Local account label";alice.callerIdName="Alice Test";
         QVERIFY(a.addAccount(alice));QVERIFY(c.addAccount(direct("charlie")));
         connect(&c,&stel::SipEngine::callChanged,&c,[&](const stel::CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,&c,[&,id=i.id]{c.answer(id,false);});});
@@ -180,7 +185,7 @@ private slots:
     }
     void failedOutgoingCallShowsReason() {
         QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({direct("bob")},p));
-        stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();stel::SipEngine a;p.dnd=true;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
+        stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();IsolatedSipEngine a;p.dnd=true;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
         auto *target=w.findChild<QLineEdit*>("dialTarget");target->setText(uri(a,"alice"));QTest::keyClick(target,Qt::Key_Return);QPointer<stel::CallDialog> d=w.findChild<stel::CallDialog*>();QVERIFY(d&&d->isVisible());
         QTRY_COMPARE_WITH_TIMEOUT(d->callInfo().rawState,LinphoneCallError,5000);QVERIFY(!d->callInfo().error.isEmpty());QVERIFY(d->findChild<QLabel*>("callActionResult")->isVisible());QVERIFY(!button(*d,"callHangup")->isEnabled());QVERIFY(w.isVisible());captureCall(*d,"call-failed");
         QTRY_COMPARE_WITH_TIMEOUT(w.findChild<QListWidget*>("activeCalls")->count(),0,5000);
@@ -194,7 +199,7 @@ private slots:
         // The two independent loopback endpoints must not allocate overlapping
         // RTP/RTCP ports; unlike real remote hosts they share this machine's IP.
         auto peerPrefs=p;peerPrefs.audioPortMin=12000;peerPrefs.audioPortMax=12098;peerPrefs.videoPortMin=13000;peerPrefs.videoPortMax=13098;
-        stel::SipEngine a;QVERIFY(a.start(peerPrefs,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
+        IsolatedSipEngine a;QVERIFY(a.start(peerPrefs,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
         connect(&a,&stel::SipEngine::callChanged,&a,[&](const stel::CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,&a,[&,id=i.id]{a.answer(id,true);});});
         if(incoming){QVERIFY(a.dial("alice",uri(*engine,"bob"),true));QTRY_VERIFY_WITH_TIMEOUT(dialog(w,true),6000);auto *d=dialog(w,true);QVERIFY(button(*d,"callAnswerVideo")->isVisible());QTest::mouseClick(button(*d,"callAnswerVideo"),Qt::LeftButton);}
         else {w.findChild<QLineEdit*>("dialTarget")->setText(uri(a,"alice"));QPushButton *video=nullptr;for(auto *b:w.findChildren<QPushButton*>())if(b->text()=="Video call")video=b;QVERIFY(video);QTest::mouseClick(video,Qt::LeftButton);}
@@ -216,7 +221,7 @@ private slots:
     void consultationActions() {
         QFETCH(bool,conference);QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();
         stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({direct("bob")},p));stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();auto *engine=w.findChild<stel::SipEngine*>();QVERIFY(engine);
-        stel::SipEngine a,c;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(c.start(p,tmp.path()+"/c",true));QVERIFY(a.addAccount(direct("alice")));QVERIFY(c.addAccount(direct("charlie")));
+        IsolatedSipEngine a,c;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(c.start(p,tmp.path()+"/c",true));QVERIFY(a.addAccount(direct("alice")));QVERIFY(c.addAccount(direct("charlie")));
         for(auto *e:{&a,&c})connect(e,&stel::SipEngine::callChanged,e,[e](const stel::CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,e,[e,id=i.id]{e->answer(id,false);});});
         auto *target=w.findChild<QLineEdit*>("dialTarget");target->setText(uri(a,"alice"));QTest::keyClick(target,Qt::Key_Return);QTRY_VERIFY_WITH_TIMEOUT(streams(a)&&streams(*engine),8000);
         auto *original=dialog(w,false);QVERIFY(original);const auto originalId=original->callInfo().id;
@@ -336,7 +341,7 @@ private slots:
     }
     void incomingCallAutomaticallyAnswersAndShowsCallerName(){
         QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();auto bob=direct("bob");bob.autoAnswer=true;stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({bob},p));
-        stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();auto *e=w.findChild<stel::SipEngine*>();stel::SipEngine a;QVERIFY(a.start(p,tmp.path()+"/a",true));auto alice=direct("alice");alice.callerIdName="Support Team";QVERIFY(a.addAccount(alice));QVERIFY(a.dial("alice",uri(*e,"bob")));
+        stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();auto *e=w.findChild<stel::SipEngine*>();IsolatedSipEngine a;QVERIFY(a.start(p,tmp.path()+"/a",true));auto alice=direct("alice");alice.callerIdName="Support Team";QVERIFY(a.addAccount(alice));QVERIFY(a.dial("alice",uri(*e,"bob")));
         QTRY_VERIFY_WITH_TIMEOUT(streams(a)&&streams(*e),6000);auto *d=dialog(w,true);QVERIFY(d&&d->isVisible());QCOMPARE(d->findChild<QLabel*>("callerName")->text(),QString("Support Team"));QVERIFY(!button(*d,"callAnswer")->isVisible());screenshot(*d,"auto-answered-call");
         for(const auto &i:a.calls())a.hangup(i.id);
         QTRY_VERIFY_WITH_TIMEOUT(a.calls().isEmpty()&&e->calls().isEmpty(),6000);

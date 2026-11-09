@@ -1,4 +1,4 @@
-#include "sipengine.h"
+#include "isolatedsipengine.h"
 #include "secretstore.h"
 #include "minipbx.h"
 #include <QDataStream>
@@ -34,24 +34,24 @@ MSFilterDesc decodedSinkDesc={MS_FILTER_PLUGIN_ID,"StelDecodedVideoSink","Decode
 bool waitFor(const std::function<bool()> &condition,int timeout=7000) {
     QElapsedTimer t;t.start();while(t.elapsed()<timeout){if(condition())return true;QTest::qWait(20);}return condition();
 }
-QString activeId(SipEngine &e) {for(const auto &i:e.calls())if(i.rawState!=LinphoneCallEnd&&i.rawState!=LinphoneCallReleased)return i.id;return {};}
-bool streams(SipEngine &e) {for(const auto &i:e.calls())if(i.rawState==LinphoneCallStreamsRunning)return true;return false;}
-QString uri(SipEngine &e,const QString &user) {
+QString activeId(IsolatedSipEngine &e) {for(const auto &i:e.calls())if(i.rawState!=LinphoneCallEnd&&i.rawState!=LinphoneCallReleased)return i.id;return {};}
+bool streams(IsolatedSipEngine &e) {for(const auto &i:e.calls())if(i.rawState==LinphoneCallStreamsRunning)return true;return false;}
+QString uri(IsolatedSipEngine &e,const QString &user) {
     auto *t=linphone_core_get_transports_used(e.native());const int port=linphone_transports_get_udp_port(t);linphone_transports_unref(t);
     return "sip:"+user+"@127.0.0.1:"+QString::number(port);
 }
 Account direct(const QString &user,const QString &enc="none") {
     Account a;a.id=user;a.label=user;a.username=user;a.domain="localhost";a.transport="udp";a.encryption=enc;a.ice=false;a.registerEnabled=false;return a;
 }
-void autoAnswer(SipEngine &e,bool video=false) {
-    QObject::connect(&e,&SipEngine::callChanged,&e,[&e,video](const CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,&e,[&e,id=i.id,video]{e.answer(id,video);});});
+void autoAnswer(IsolatedSipEngine &e,bool video=false) {
+    QObject::connect(&e,&IsolatedSipEngine::callChanged,&e,[&e,video](const CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,&e,[&e,id=i.id,video]{e.answer(id,video);});});
 }
 void writeTone(const QString &path) {
     QFile f(path);f.open(QIODevice::WriteOnly);QDataStream out(&f);out.setByteOrder(QDataStream::LittleEndian);
     constexpr int samples=8000*30;f.write("RIFF",4);out<<quint32(36+samples*2);f.write("WAVEfmt ",8);out<<quint32(16)<<quint16(1)<<quint16(1)<<quint32(8000)<<quint32(16000)<<quint16(2)<<quint16(16);f.write("data",4);out<<quint32(samples*2);
     for(int n=0;n<samples;++n)out<<qint16(std::sin(n*2*3.141592653589793*440/8000)*5000);
 }
-double download(SipEngine &e,bool video=false) {
+double download(IsolatedSipEngine &e,bool video=false) {
     for(const auto &i:e.calls()) {
         const auto *list=linphone_core_get_calls(e.native());
         for(auto *node=list;node;node=node->next) {
@@ -67,8 +67,9 @@ double download(SipEngine &e,bool video=false) {
 class CoreTests:public QObject {
     Q_OBJECT
 private slots:
+    void init(){IsolatedSipEngine::resetPortPools();}
     void initTestCase() {
-        const auto resources=qEnvironmentVariable("STEL_RESOURCE_PREFIX");if(!resources.isEmpty())SipEngine::configureResources(resources);
+        const auto resources=qEnvironmentVariable("STEL_RESOURCE_PREFIX");if(!resources.isEmpty())IsolatedSipEngine::configureResources(resources);
         if(qEnvironmentVariableIsSet("STEL_VERBOSE_TESTS"))linphone_logging_service_set_log_level(linphone_logging_service_get(),LinphoneLogLevelMessage);
     }
     void persistenceWithoutSecrets() {
@@ -97,7 +98,7 @@ private slots:
             QByteArray response="SIP/2.0 486 Busy Here\r\n";for(const auto &key:{QByteArray("via"),QByteArray("from"),QByteArray("to"),QByteArray("call-id"),QByteArray("cseq")})response+=key+": "+h[key]+(key=="to"?";tag=caller-id-test":"")+"\r\n";
             response+="Content-Length: 0\r\n\r\n";peer.writeDatagram(response,address,port);
         }});
-        SipEngine e;QVERIFY(e.start({},tmp.path(),true));auto a=direct("alice");a.label="Local account label";a.callerIdName=name;QVERIFY(a.validate().isEmpty());QVERIFY(e.addAccount(a));
+        IsolatedSipEngine e;QVERIFY(e.start({},tmp.path(),true));auto a=direct("alice");a.label="Local account label";a.callerIdName=name;QVERIFY(a.validate().isEmpty());QVERIFY(e.addAccount(a));
         QVERIFY(e.dial(a.id,"sip:bob@127.0.0.1:"+QString::number(peer.localPort())));QVERIFY(waitFor([&]{return !from.isEmpty();}));
         auto *parsed=linphone_factory_create_address(linphone_factory_get(),from.constData());QVERIFY2(parsed,from.constData());QCOMPARE(QString::fromUtf8(linphone_address_get_display_name(parsed)),name);QCOMPARE(QString::fromUtf8(linphone_address_get_username(parsed)),QString("alice"));linphone_address_unref(parsed);
         QVERIFY(!from.contains("Local account label"));if(name.contains('"'))QVERIFY(from.contains("\\\"Desk\\\""));
@@ -109,14 +110,14 @@ private slots:
         QTest::newRow("disabled")<<QString("none")<<false<<false;QTest::newRow("video-offer-audio-answer")<<QString("none")<<true<<true;
     }
     void accountAutoAnswer(){
-        QFETCH(QString,mode);QFETCH(bool,enabled);QFETCH(bool,video);QTemporaryDir tmp;SipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));
+        QFETCH(QString,mode);QFETCH(bool,enabled);QFETCH(bool,video);QTemporaryDir tmp;IsolatedSipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));
         auto alice=direct("alice",mode),bob=direct("bob",mode);bob.autoAnswer=enabled;QVERIFY(a.addAccount(alice));QVERIFY(b.addAccount(bob));QVERIFY(a.dial("alice",uri(b,"bob"),video));
         if(enabled){QVERIFY2(waitFor([&]{return streams(a)&&streams(b)&&download(a)>0&&download(b)>0;}),qPrintable(b.lastError()));for(const auto &i:b.calls())QVERIFY(!i.video);}
         else {QVERIFY(waitFor([&]{return !b.calls().isEmpty();}));QTest::qWait(300);QVERIFY(!streams(a)&&!streams(b));QCOMPARE(b.calls().first().rawState,LinphoneCallIncomingReceived);}
         QVERIFY(a.hangup(activeId(a)));QVERIFY(waitFor([&]{return a.calls().isEmpty()&&b.calls().isEmpty();}));
     }
     void autoAnswerIsPerAccount(){
-        QTemporaryDir tmp;MiniPbx pbx;SipEngine e;QVERIFY(e.start({},tmp.path(),true));auto alice=direct("alice"),bob=direct("bob");alice.server=bob.server=pbx.server();alice.registerEnabled=bob.registerEnabled=true;bob.autoAnswer=true;
+        QTemporaryDir tmp;MiniPbx pbx;IsolatedSipEngine e;QVERIFY(e.start({},tmp.path(),true));auto alice=direct("alice"),bob=direct("bob");alice.server=bob.server=pbx.server();alice.registerEnabled=bob.registerEnabled=true;bob.autoAnswer=true;
         QVERIFY(e.addAccount(alice));QVERIFY(e.addAccount(bob));QVERIFY(waitFor([&]{return pbx.registered("alice")&&pbx.registered("bob");}));QVERIFY(e.dial("alice","bob"));
         QVERIFY(waitFor([&]{if(e.calls().size()!=2)return false;for(const auto &i:e.calls())if(i.rawState!=LinphoneCallStreamsRunning||i.audioDownKbps<=0)return false;return true;}));
         for(const auto &i:e.calls())if(!i.incoming){QVERIFY(e.hangup(i.id));break;}QVERIFY(waitFor([&]{return e.calls().isEmpty();}));
@@ -124,16 +125,16 @@ private slots:
         for(const auto &i:e.calls())if(!i.incoming){QVERIFY(e.hangup(i.id));break;}QVERIFY(waitFor([&]{return e.calls().isEmpty();}));
     }
     void dndAndForwardOverrideAutoAnswer(){
-        QTemporaryDir tmp;SipEngine a,b,c;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(c.start({},tmp.path()+"/c",true));
+        QTemporaryDir tmp;IsolatedSipEngine a,b,c;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(c.start({},tmp.path()+"/c",true));
         auto bob=direct("bob"),charlie=direct("charlie");bob.autoAnswer=charlie.autoAnswer=true;QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(bob));QVERIFY(c.addAccount(charlie));
-        b.setDnd(true);QSignalSpy finished(&a,&SipEngine::callFinished);QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY(waitFor([&]{return !finished.isEmpty();}));QVERIFY(!streams(b));QVERIFY(waitFor([&]{return a.calls().isEmpty()&&b.calls().isEmpty();}));
+        b.setDnd(true);QSignalSpy finished(&a,&IsolatedSipEngine::callFinished);QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY(waitFor([&]{return !finished.isEmpty();}));QVERIFY(!streams(b));QVERIFY(waitFor([&]{return a.calls().isEmpty()&&b.calls().isEmpty();}));
         QVERIFY(b.removeAccount("bob"));bob.forwardTo=uri(c,"charlie");QVERIFY(b.addAccount(bob));QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY(waitFor([&]{return streams(a)&&streams(c)&&b.calls().isEmpty();}));
         QVERIFY(a.hangup(activeId(a)));QVERIFY(waitFor([&]{return a.calls().isEmpty()&&c.calls().isEmpty();}));
     }
     void manualRejectBeforeQueuedAutoAnswer(){
-        QTemporaryDir tmp;SipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));auto bob=direct("bob");bob.autoAnswer=true;QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(bob));
-        QSignalSpy errors(&b,&SipEngine::errorOccurred),finished(&a,&SipEngine::callFinished);bool connected=false;
-        connect(&b,&SipEngine::callChanged,&b,[&](const CallInfo &i){connected|=i.rawState==LinphoneCallStreamsRunning;if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,&b,[&,id=i.id]{b.hangup(id);});});
+        QTemporaryDir tmp;IsolatedSipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));auto bob=direct("bob");bob.autoAnswer=true;QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(bob));
+        QSignalSpy errors(&b,&IsolatedSipEngine::errorOccurred),finished(&a,&IsolatedSipEngine::callFinished);bool connected=false;
+        connect(&b,&IsolatedSipEngine::callChanged,&b,[&](const CallInfo &i){connected|=i.rawState==LinphoneCallStreamsRunning;if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,&b,[&,id=i.id]{b.hangup(id);});});
         QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY(waitFor([&]{return !finished.isEmpty();}));QVERIFY(!connected);QVERIFY(errors.isEmpty());
     }
     void defaultMediaIsRtp() {
@@ -149,12 +150,12 @@ private slots:
             QByteArray response="SIP/2.0 488 Not Acceptable Here\r\n";for(const auto &name:{QByteArray("via"),QByteArray("from"),QByteArray("to"),QByteArray("call-id"),QByteArray("cseq")})response+=name+": "+headers[name]+(name=="to"?";tag=no-srtp":"")+"\r\n";
             response+="Content-Length: 0\r\n\r\n";pbx.writeDatagram(response,peer,port);
         }});
-        SipEngine e;QVERIFY(e.start({},tmp.path(),true));QVERIFY(e.addAccount(direct("alice","srtp")));QSignalSpy done(&e,&SipEngine::callFinished);
+        IsolatedSipEngine e;QVERIFY(e.start({},tmp.path(),true));QVERIFY(e.addAccount(direct("alice","srtp")));QSignalSpy done(&e,&IsolatedSipEngine::callFinished);
         QVERIFY(e.dial("alice","sip:bob@127.0.0.1:"+QString::number(pbx.localPort())));QVERIFY(waitFor([&]{return !done.isEmpty();}));QCOMPARE(invites,1);QVERIFY(!plaintext);
     }
     void requiredSrtpRejectsPlainIncomingOffer() {
-        QTemporaryDir tmp;SipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(direct("bob","srtp")));
-        QString incoming;connect(&b,&SipEngine::callChanged,&b,[&](const CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)incoming=i.id;});QSignalSpy done(&a,&SipEngine::callFinished);
+        QTemporaryDir tmp;IsolatedSipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(direct("bob","srtp")));
+        QString incoming;connect(&b,&IsolatedSipEngine::callChanged,&b,[&](const CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)incoming=i.id;});QSignalSpy done(&a,&IsolatedSipEngine::callFinished);
         QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY(waitFor([&]{return !incoming.isEmpty()||!done.isEmpty();}));
         if(!incoming.isEmpty()){QVERIFY(!b.answer(incoming,false));QVERIFY(b.lastError().contains("requires SRTP"));}
         QVERIFY(waitFor([&]{return !done.isEmpty();}));QVERIFY(!streams(a)&&!streams(b));
@@ -173,12 +174,12 @@ private slots:
         QTest::newRow("SRTP-ICE-bob-to-alice")<<QString("srtp")<<true<<QString("bob");
     }
     void callsBetweenAccounts() {
-        QFETCH(QString,security);QFETCH(bool,ice);QFETCH(QString,caller);const QString callee=caller=="alice"?"bob":"alice";QTemporaryDir tmp;MiniPbx pbx;SipEngine e;
+        QFETCH(QString,security);QFETCH(bool,ice);QFETCH(QString,caller);const QString callee=caller=="alice"?"bob":"alice";QTemporaryDir tmp;MiniPbx pbx;IsolatedSipEngine e;
         Preferences p;p.inputDevice=dummyMicTone();p.outputDevice=dummySpeaker();QVERIFY(e.start(p,tmp.path(),true));
         auto a=direct("alice",security),b=direct("bob",security);a.registerEnabled=b.registerEnabled=true;a.server=b.server=pbx.server();a.ice=b.ice=ice;
         QVERIFY(e.addAccount(a));QVERIFY(e.addAccount(b));QVERIFY(waitFor([&]{return pbx.registered("alice")&&pbx.registered("bob");}));
         QString incoming,outgoing;QStringList events;
-        connect(&e,&SipEngine::callChanged,&e,[&](const CallInfo &i){events<<i.accountId+" "+i.state+" "+i.message;if(i.rawState==LinphoneCallIncomingReceived)incoming=i.id;if(!i.incoming)outgoing=i.id;});
+        connect(&e,&IsolatedSipEngine::callChanged,&e,[&](const CallInfo &i){events<<i.accountId+" "+i.state+" "+i.message;if(i.rawState==LinphoneCallIncomingReceived)incoming=i.id;if(!i.incoming)outgoing=i.id;});
         QVERIFY(e.dial(caller,callee));QVERIFY2(waitFor([&]{return !incoming.isEmpty();}),qPrintable(events.join('\n')));
         for(const auto &i:e.calls())if(i.id==incoming)QCOMPARE(i.accountId,callee);
         QVERIFY2(e.answer(incoming,false),qPrintable(e.lastError()));
@@ -205,7 +206,7 @@ private slots:
         QByteArray secret;QVERIFY(SecretStore(tmp.path()).read(secret,&error));QVERIFY(secret.isEmpty());
     }
     void codecPolicyAndPersistence() {
-        QTemporaryDir tmp;SipEngine e;QVERIFY(e.start({},tmp.path()+"/engine",true));
+        QTemporaryDir tmp;IsolatedSipEngine e;QVERIFY(e.start({},tmp.path()+"/engine",true));
         const auto inventory=e.availableCodecs(false);QVERIFY(inventory.size()>=5);QStringList selected;
         for(const auto &c:inventory)if(c.mime=="G729"||c.mime=="PCMA")selected.prepend(c.id);
         QVERIFY(!selected.isEmpty());QVERIFY2(e.applyCodecSelection(false,selected),qPrintable(e.lastError()));
@@ -214,18 +215,18 @@ private slots:
         actual.clear();for(const auto &c:e.availableCodecs(false))if(c.enabled)actual<<c.id;QCOMPARE(actual,selected);
         Preferences p;p.customAudioCodecs=true;p.audioCodecs=selected;Store store(tmp.path()+"/settings");QVERIFY(store.save({},p));
         QVector<Account> accounts;Preferences restored;QVERIFY(store.load(accounts,restored));QCOMPARE(restored.toJson(),p.toJson());
-        SipEngine restarted;QVERIFY(restarted.start(restored,tmp.path()+"/restart",true));actual.clear();for(const auto &c:restarted.availableCodecs(false))if(c.enabled)actual<<c.id;QCOMPARE(actual,selected);
+        IsolatedSipEngine restarted;QVERIFY(restarted.start(restored,tmp.path()+"/restart",true));actual.clear();for(const auto &c:restarted.availableCodecs(false))if(c.enabled)actual<<c.id;QCOMPARE(actual,selected);
         QVERIFY(restarted.applyCodecSelection(false,{},false));QVERIFY(restarted.codecs(false).contains("opus/48000"));
     }
     void forcedAudioCodec_data() {
-        QTest::addColumn<QString>("codec");QTest::addColumn<QString>("mime");QTemporaryDir tmp;SipEngine e;QVERIFY(e.start({},tmp.path(),true));
+        QTest::addColumn<QString>("codec");QTest::addColumn<QString>("mime");QTemporaryDir tmp;IsolatedSipEngine e;QVERIFY(e.start({},tmp.path(),true));
         for(const auto &c:e.availableCodecs(false))if(c.available)QTest::newRow(qPrintable(c.id))<<c.id<<c.mime;
     }
     void forcedAudioCodec() {
         QFETCH(QString,codec);QFETCH(QString,mime);QTemporaryDir tmp;
         Preferences p;p.inputDevice=dummyMicTone();p.outputDevice=dummySpeaker();p.customAudioCodecs=true;p.audioCodecs=QStringList{codec};
         Preferences q=p;q.inputDevice=dummyMicSilence();q.audioPortMin=12000;q.audioPortMax=12098;
-        SipEngine a,b;QVERIFY2(a.start(p,tmp.path()+"/a",true),qPrintable(a.lastError()));QVERIFY(b.start(q,tmp.path()+"/b",true));
+        IsolatedSipEngine a,b;QVERIFY2(a.start(p,tmp.path()+"/a",true),qPrintable(a.lastError()));QVERIFY(b.start(q,tmp.path()+"/b",true));
         QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(direct("bob")));autoAnswer(b);
         QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY2(waitFor([&]{return streams(a)&&streams(b);}),qPrintable(codec));
         QVERIFY(a.calls().first().audioCodec.startsWith(mime+"/"));QVERIFY(b.calls().first().audioCodec.startsWith(mime+"/"));
@@ -236,16 +237,16 @@ private slots:
         bool audible=false;for(int n=128;n+1<pcm.size();n+=2){qint16 sample=qint16(quint8(pcm[n])|(quint16(quint8(pcm[n+1]))<<8));audible|=std::abs(int(sample))>200;}QVERIFY2(audible,qPrintable("No decoded tone with "+codec));
     }
     void forcedVideoCodec_data() {
-        QTest::addColumn<QString>("codec");QTest::addColumn<QString>("mime");QTemporaryDir tmp;SipEngine e;QVERIFY(e.start({},tmp.path(),true));
+        QTest::addColumn<QString>("codec");QTest::addColumn<QString>("mime");QTemporaryDir tmp;IsolatedSipEngine e;QVERIFY(e.start({},tmp.path(),true));
         for(const auto &c:e.availableCodecs(true))if(c.available)QTest::newRow(qPrintable(c.id))<<c.id<<c.mime;
     }
     void forcedVideoCodec() {
         QFETCH(QString,codec);QFETCH(QString,mime);QTemporaryDir tmp;Preferences p;p.videoDevice=dummyCamera();p.customVideoCodecs=true;p.videoCodecs=QStringList{codec};
-        SipEngine a,b;QVERIFY(a.start(p,tmp.path()+"/a",true));p.audioPortMin=12000;p.audioPortMax=12098;p.videoPortMin=13000;p.videoPortMax=13098;QVERIFY(b.start(p,tmp.path()+"/b",true));
+        IsolatedSipEngine a,b;QVERIFY(a.start(p,tmp.path()+"/a",true));p.audioPortMin=12000;p.audioPortMax=12098;p.videoPortMin=13000;p.videoPortMax=13098;QVERIFY(b.start(p,tmp.path()+"/b",true));
         decodedVideoFrames=0;videoReceiverFactory=linphone_core_get_ms_factory(b.native());
         for(auto *e:{&a,&b}){ms_factory_register_filter(linphone_core_get_ms_factory(e->native()),&decodedSinkDesc);linphone_core_enable_video_display(e->native(),TRUE);linphone_core_set_video_display_filter(e->native(),"StelDecodedVideoSink");linphone_core_set_preferred_video_definition_by_name(e->native(),"cif");linphone_core_set_preferred_framerate(e->native(),10);}
         QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(direct("bob")));int decoded=0;
-        connect(&b,&SipEngine::callChanged,&b,[&](const CallInfo &i){if(i.rawState!=LinphoneCallIncomingReceived)return;
+        connect(&b,&IsolatedSipEngine::callChanged,&b,[&](const CallInfo &i){if(i.rawState!=LinphoneCallIncomingReceived)return;
             auto *call=static_cast<LinphoneCall*>(linphone_core_get_calls(b.native())->data);auto *cb=linphone_factory_create_call_cbs(linphone_factory_get());linphone_call_cbs_set_user_data(cb,&decoded);
             linphone_call_cbs_set_next_video_frame_decoded(cb,[](LinphoneCall *c){++*static_cast<int*>(linphone_call_cbs_get_user_data(linphone_call_get_current_callbacks(c)));});linphone_call_add_callbacks(call,cb);linphone_call_cbs_unref(cb);linphone_call_request_notify_next_video_frame_decoded(call);
         });autoAnswer(b,true);
@@ -255,11 +256,11 @@ private slots:
         QVERIFY(a.hangup(activeId(a)));QVERIFY(waitFor([&]{return a.calls().isEmpty()&&b.calls().isEmpty();}));
     }
     void dummyDevicesAndSeparateNetworks() {
-        QTemporaryDir tmp;Preferences p;p.inputDevice=dummyMicTone();p.outputDevice=dummySpeaker();p.videoDevice=dummyCamera();
+        QTemporaryDir tmp;Preferences p;p.audioPortMin=14000;p.audioPortMax=14098;p.videoPortMin=15000;p.videoPortMax=15098;p.inputDevice=dummyMicTone();p.outputDevice=dummySpeaker();p.videoDevice=dummyCamera();
         p.signallingAddress="127.0.0.1";p.mediaAddress="127.0.0.1";
         QUdpSocket freePort;QVERIFY(freePort.bind(QHostAddress(QHostAddress::LocalHost),quint16(0)));p.sipUdpPort=freePort.localPort();freePort.close();
         for(const auto &address:localAddresses())if(QHostAddress(address.address).protocol()==QAbstractSocket::IPv4Protocol&&!QHostAddress(address.address).isLoopback()){p.mediaAddress=address.address;break;}
-        SipEngine a,b;QVERIFY2(a.start(p,tmp.path()+"/a",true),qPrintable(a.lastError()));
+        IsolatedSipEngine a,b;QVERIFY2(a.start(p,tmp.path()+"/a",true),qPrintable(a.lastError()));
         auto *sipPorts=linphone_core_get_transports_used(a.native());QCOMPARE(linphone_transports_get_udp_port(sipPorts),p.sipUdpPort);linphone_transports_unref(sipPorts);
         QVERIFY(a.soundDevices().join(' ').contains("Dummy mic"));QVERIFY(QFileInfo(tmp.path()+"/a/dummy-camera.jpg").size()>1000);
         // Both media endpoints use the selected media interface. Windows cannot
@@ -299,7 +300,7 @@ private slots:
         Store store(tmp.path()+"/saved");QVERIFY(store.save({},p));QVector<Account> restored;Preferences saved;QVERIFY(store.load(restored,saved));QCOMPARE(saved.toJson(),p.toJson());
     }
     void audioHoldDtmfAndRecording() {
-        QTemporaryDir tmp;SipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));
+        QTemporaryDir tmp;IsolatedSipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));
         QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(direct("bob")));autoAnswer(b);
         int receivedDtmf=0;
         auto *dtmfCallbacks=linphone_factory_create_core_cbs(linphone_factory_get());
@@ -327,7 +328,7 @@ private slots:
     }
     void encryptedVideo() {
         QFETCH(QString,encryption);
-        QTemporaryDir tmp;SipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));
+        QTemporaryDir tmp;IsolatedSipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));
         auto alice=direct("alice",encryption),bob=direct("bob",encryption);
         if(encryption=="dtls"){alice.ice=bob.ice=true;alice.webrtc=bob.webrtc=true;}
         QVERIFY(a.addAccount(alice));QVERIFY(b.addAccount(bob));autoAnswer(b,true);
@@ -338,13 +339,13 @@ private slots:
         QVERIFY(a.hangup(activeId(a)));QVERIFY(waitFor([&]{return a.calls().isEmpty()&&b.calls().isEmpty();}));
     }
     void forwarding() {
-        QTemporaryDir tmp;SipEngine a,b,c;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(c.start({},tmp.path()+"/c",true));
+        QTemporaryDir tmp;IsolatedSipEngine a,b,c;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(c.start({},tmp.path()+"/c",true));
         auto bob=direct("bob");bob.forwardTo=uri(c,"charlie");QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(bob));QVERIFY(c.addAccount(direct("charlie")));autoAnswer(c);
         QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY2(waitFor([&]{return streams(a)&&streams(c);}),"302 must redirect caller to the third endpoint");
         a.hangup(activeId(a));QVERIFY(waitFor([&]{return a.calls().isEmpty()&&c.calls().isEmpty();}));
     }
     void blindTransfer() {
-        QTemporaryDir tmp;SipEngine a,b,c;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(c.start({},tmp.path()+"/c",true));
+        QTemporaryDir tmp;IsolatedSipEngine a,b,c;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(c.start({},tmp.path()+"/c",true));
         QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(direct("bob")));QVERIFY(c.addAccount(direct("charlie")));autoAnswer(b);autoAnswer(c);
         QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY(waitFor([&]{return streams(a)&&streams(b);}));
         QVERIFY(b.transfer(activeId(b),uri(c,"charlie")));
@@ -354,7 +355,7 @@ private slots:
         QVERIFY(waitFor([&]{return a.calls().isEmpty()&&c.calls().isEmpty();}));
     }
     void attendedTransfer() {
-        QTemporaryDir tmp;SipEngine a,b,c;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(c.start({},tmp.path()+"/c",true));
+        QTemporaryDir tmp;IsolatedSipEngine a,b,c;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(c.start({},tmp.path()+"/c",true));
         QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(direct("bob")));QVERIFY(c.addAccount(direct("charlie")));autoAnswer(b);autoAnswer(c);
         QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY(waitFor([&]{return streams(a)&&streams(b);}));
         const auto original=activeId(b);QVERIFY(b.hold(original,true));QVERIFY(waitFor([&]{for(const auto &i:b.calls())if(i.id==original&&i.rawState==LinphoneCallPaused)return true;return false;}));
@@ -367,14 +368,14 @@ private slots:
         QVERIFY(waitFor([&]{return a.calls().isEmpty()&&c.calls().isEmpty();}));
     }
     void dndAndMultipleAccounts() {
-        QTemporaryDir tmp;SipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));Preferences p;p.dnd=true;QVERIFY(b.start(p,tmp.path()+"/b",true));
+        QTemporaryDir tmp;IsolatedSipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));Preferences p;p.dnd=true;QVERIFY(b.start(p,tmp.path()+"/b",true));
         QVERIFY(a.addAccount(direct("alice")));QVERIFY(a.addAccount(direct("second")));QVERIFY(b.addAccount(direct("bob")));
-        QSignalSpy done(&a,&SipEngine::callFinished);QVERIFY(a.dial("second",uri(b,"bob")));QVERIFY(waitFor([&]{return !done.isEmpty();}));QVERIFY(!streams(b));
+        QSignalSpy done(&a,&IsolatedSipEngine::callFinished);QVERIFY(a.dial("second",uri(b,"bob")));QVERIFY(waitFor([&]{return !done.isEmpty();}));QVERIFY(!streams(b));
         QVERIFY(a.removeAccount("second"));QVERIFY(!a.dial("second",uri(b,"bob")));
     }
     void conferenceJoinsOnlySelectedCalls() {
-        QTemporaryDir tmp;SipEngine host,a,b,c;QVERIFY(host.start({},tmp.path()+"/host",true));QVERIFY(host.addAccount(direct("host")));
-        const QList<SipEngine*> peers{&a,&b,&c};const QStringList users{"alice","bob","charlie"};QStringList ids;
+        QTemporaryDir tmp;IsolatedSipEngine host,a,b,c;QVERIFY(host.start({},tmp.path()+"/host",true));QVERIFY(host.addAccount(direct("host")));
+        const QList<IsolatedSipEngine*> peers{&a,&b,&c};const QStringList users{"alice","bob","charlie"};QStringList ids;
         for(int n=0;n<peers.size();++n) {
             auto &peer=*peers[n];QVERIFY(peer.start({},tmp.path()+"/"+users[n],true));QVERIFY(peer.addAccount(direct(users[n])));autoAnswer(peer);
             QVERIFY(host.dial("host",uri(peer,users[n])));QVERIFY(waitFor([&]{return streams(host)&&streams(peer);}));
@@ -388,7 +389,7 @@ private slots:
         QVERIFY(waitFor([&]{return host.calls().isEmpty()&&a.calls().isEmpty()&&b.calls().isEmpty()&&c.calls().isEmpty();}));
     }
     void localConference() {
-        QTemporaryDir tmp;SipEngine a,b,c;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(c.start({},tmp.path()+"/c",true));
+        QTemporaryDir tmp;IsolatedSipEngine a,b,c;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));QVERIFY(c.start({},tmp.path()+"/c",true));
         QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(direct("bob")));QVERIFY(c.addAccount(direct("charlie")));autoAnswer(b);autoAnswer(c);
         QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY(waitFor([&]{return streams(a)&&streams(b);}));
         const auto original=activeId(b);QVERIFY(b.hold(original,true));QVERIFY(waitFor([&]{for(const auto &i:b.calls())if(i.rawState==LinphoneCallPaused)return true;return false;}));
