@@ -113,7 +113,7 @@ jobs:
         with:
           arch: x64
           toolset: '14.29'
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: dependencies
         with:
           path: C:/stel-deps
@@ -140,6 +140,12 @@ jobs:
         env:
           STEL_MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
         run: ./scripts/ci/windows-deps.ps1
+      - name: Cache the successfully compiled SDK
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.dependencies.outputs.cache-hit != 'true'
+        with:
+          path: C:/stel-deps
+          key: ${{ steps.dependencies.outputs.cache-primary-key }}
       - run: ./scripts/ci/windows-build.ps1
       - run: |
           python scripts/ci/windows-sources.py

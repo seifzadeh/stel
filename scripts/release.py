@@ -10,7 +10,7 @@ import tarfile
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_PATTERN = r'project\(Stel VERSION (\d+\.\d+\.\d+) LANGUAGES'
-SOURCE_PATHS = ('CMakeLists.txt', '.gitignore', '.gitattributes', '.github', 'src',
+SOURCE_PATHS = ('CMakeLists.txt', '.gitignore', '.gitattributes', '.github', 'cmake', 'src',
                 'tests', 'scripts', 'docs', 'website', 'packaging', 'third_party',
                 'README.md', 'README.fa.md', 'LICENSE', 'LICENSES', 'NOTICE.md',
                 'THIRD_PARTY.md', 'CHANGELOG.md', 'CONTRIBUTING.md')
