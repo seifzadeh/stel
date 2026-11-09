@@ -59,6 +59,7 @@ $KeychainSource = "$Destination/src/qtkeychain"
 Checkout-Pinned $Lock.linphone_sdk $SdkSource
 Checkout-Pinned $Lock.qtkeychain $KeychainSource
 if ($DownloadOnly) { Write-Host 'Pinned dependency sources and SDK gitlinks verified.'; return }
+Checked { & $Python "$Project/scripts/ci/patch-sdk.py" $SdkSource }
 $env:PATH += ';C:/Program Files/7-Zip'
 $SdkBuild = "$Destination/build-sdk"
 Checked { cmake -S $SdkSource -B $SdkBuild -G Ninja `
@@ -92,5 +93,6 @@ Get-ChildItem "$Destination/src" -Recurse -File | Where-Object {
 & git -C $SdkSource submodule status --recursive | Set-Content "$Destination/notices/sdk-submodules.txt"
 if ($LASTEXITCODE) { throw 'Cannot record SDK source revisions' }
 Copy-Item "$Project/packaging/dependencies.json" "$Destination/notices/dependencies.json"
+Copy-Item "$Project/packaging/patches" "$Destination/notices" -Recurse -Force
 # Cache installed libraries, exact sources and notices, rather than object files.
 Remove-Item $SdkBuild, "$Destination/build-keychain" -Recurse -Force

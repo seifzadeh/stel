@@ -117,7 +117,25 @@ jobs:
         id: dependencies
         with:
           path: C:/stel-deps
-          key: windows-v142-${{ hashFiles('packaging/dependencies.json', 'scripts/ci/windows-deps.ps1', 'scripts/ci/fetch-source-archives.py') }}
+          key: windows-v142-${{ hashFiles('packaging/dependencies.json', 'scripts/ci/windows-deps.ps1', 'scripts/ci/fetch-source-archives.py', 'scripts/ci/patch-sdk.py', 'packaging/patches/**') }}
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.dependencies.outputs.cache-hit != 'true'
+        id: sources
+        with:
+          path: |
+            C:/stel-deps/src
+            C:/stel-deps/archives
+          key: windows-sdk-sources-${{ hashFiles('packaging/dependencies.json') }}
+      - name: Fetch and verify SDK sources
+        if: steps.dependencies.outputs.cache-hit != 'true'
+        run: ./scripts/ci/windows-deps.ps1 -DownloadOnly
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.dependencies.outputs.cache-hit != 'true' && steps.sources.outputs.cache-hit != 'true'
+        with:
+          path: |
+            C:/stel-deps/src
+            C:/stel-deps/archives
+          key: windows-sdk-sources-${{ hashFiles('packaging/dependencies.json') }}
       - if: steps.dependencies.outputs.cache-hit != 'true'
         env:
           STEL_MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
