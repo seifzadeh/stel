@@ -48,7 +48,8 @@ SettingsWidget::SettingsWidget(SipEngine &engine,QVector<Account> &accounts,Pref
     :QWidget(parent),engine_(engine),accounts_(accounts),prefs_(prefs),store_(store),canSave_(canSave) {
     setObjectName("settingsWidget");auto *layout=new QVBoxLayout(this);layout->setContentsMargins(12,12,12,12);
     pages_=new QTabWidget;pages_->setObjectName("settingsPages");layout->addWidget(pages_);
-    pages_->addTab(accountsPage(),"Accounts");pages_->addTab(audioPage(),"Audio");pages_->addTab(videoPage(),"Video");pages_->addTab(networkPage(),"Network");pages_->addTab(securityPage(),"Security");pages_->addTab(aboutPage(),"About");
+    pages_->addTab(accountsPage(),navigationIcon(NavigationIcon::Accounts),"Accounts");pages_->addTab(audioPage(),navigationIcon(NavigationIcon::Audio),"Audio");pages_->addTab(videoPage(),navigationIcon(NavigationIcon::Video),"Video");pages_->addTab(networkPage(),navigationIcon(NavigationIcon::Network),"Network");pages_->addTab(securityPage(),navigationIcon(NavigationIcon::Security),"Security");pages_->addTab(aboutPage(),navigationIcon(NavigationIcon::Info),"About");
+    styleNavigationTabs(pages_,NavigationLevel::Settings);
     for(const auto &a:accounts_) {
         states_[a.id]=a.credentialsRequired?"CredentialsRequired":engine_.registrationState(a.id);
         if(a.credentialsRequired)details_[a.id]="No saved password was found. Enter the password once and press Register; Remember passwords is enabled by default.";
@@ -243,8 +244,9 @@ packaging and automated tests. GitHub Actions builds releases.</p>
     for(const auto &license:QStringList{"GPL-3.0","AGPL-3.0"}) {
         auto *text=new QTextBrowser;text->setObjectName("license"+license);QFile file(":/licenses/"+license+".txt");
         if(file.open(QIODevice::ReadOnly))text->setPlainText(QString::fromUtf8(file.readAll()));
-        licenseTabs->addTab(text,license);
+        licenseTabs->addTab(text,navigationIcon(NavigationIcon::Document),license);
     }
+    styleNavigationTabs(licenseTabs,NavigationLevel::Compact);
     layout->addWidget(licenseTabs);return page;
 }
 QWidget *SettingsWidget::securityPage() {

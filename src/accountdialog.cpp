@@ -1,4 +1,5 @@
 #include "accountdialog.h"
+#include "branding.h"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -18,7 +19,8 @@ namespace stel {
 AccountEditor::AccountEditor(QWidget *parent):QWidget(parent) {
     Account a;
     auto *layout=new QVBoxLayout(this); auto *tabs=new QTabWidget;tabs->setObjectName("accountTabs");layout->addWidget(tabs);
-    auto form=[&](const QString &title){auto *w=new QWidget;auto *f=new QFormLayout(w);f->setSpacing(6);tabs->addTab(w,title);return f;};
+    styleNavigationTabs(tabs,NavigationLevel::Compact);
+    auto form=[&](const QString &title,NavigationIcon icon){auto *w=new QWidget;auto *f=new QFormLayout(w);f->setSpacing(6);tabs->addTab(w,navigationIcon(icon),title);return f;};
     auto edit=[&](QFormLayout *f,const QString &key,const QString &label,const QString &value,bool secret=false){
         auto *e=new QLineEdit(value);e->setObjectName(key); if(secret)e->setEchoMode(QLineEdit::Password); text_[key]=e; f->addRow(label,e); return e;
     };
@@ -30,7 +32,7 @@ AccountEditor::AccountEditor(QWidget *parent):QWidget(parent) {
         auto *e=new QLineEdit(value);e->setObjectName(key);text_[key]=e;auto *b=new QPushButton("Browse…");row->addWidget(e);row->addWidget(b);f->addRow(label,w);
         connect(b,&QPushButton::clicked,this,[this,e]{auto s=QFileDialog::getOpenFileName(this,"Select PEM file");if(!s.isEmpty())e->setText(s);});
     };
-    auto *sip=form("General");
+    auto *sip=form("General",NavigationIcon::General);
     edit(sip,"label","Account name",a.label)->setPlaceholderText("Office / home / provider");
     auto *callerName=edit(sip,"callerIdName","Caller ID Name",a.callerIdName);callerName->setMaxLength(256);callerName->setPlaceholderText("Name shown to people you call");callerName->setToolTip("Sent as the display name in the SIP From header.");
     edit(sip,"username","SIP username",a.username);
@@ -48,18 +50,18 @@ AccountEditor::AccountEditor(QWidget *parent):QWidget(parent) {
     expiry_=new QSpinBox;expiry_->setRange(60,86400);expiry_->setValue(a.expires);
     check(sip,"enabled","Enable account",a.enabled);
     auto *note=new QLabel("Passwords are remembered by default when you Save or Register. Turn this off to keep this account's passwords only for the current run.");note->setWordWrap(true);sip->addRow(note);
-    auto *security=form("Security");
+    auto *security=form("Security",NavigationIcon::Security);
     auto *securityNote=new QLabel("TLS verifies the server certificate and hostname. Add your PBX root CA in Settings. Client certificates below enable mutual TLS per account.");securityNote->setWordWrap(true);security->addRow(securityNote);
     file(security,"certificate","Client certificate (PEM)",a.certificate);file(security,"privateKey","Private key (PEM)",a.privateKey);
     edit(security,"keyPassword","Private key password",a.keyPassword,true);
-    auto *nat=form("NAT / WebRTC");
+    auto *nat=form("NAT / WebRTC",NavigationIcon::Globe);
     nat->addRow("Registration expiry (s)",expiry_);
     check(nat,"ice","Enable ICE",a.ice);edit(nat,"stunServer","STUN / TURN server",a.stunServer)->setPlaceholderText("stun.example.com:3478");
     check(nat,"turn","Enable TURN relay",a.turn);edit(nat,"turnUser","TURN username",a.turnUser);edit(nat,"turnPassword","TURN password",a.turnPassword,true);
     auto *web=check(nat,"webrtc","WebRTC media profile (DTLS-SRTP + ICE + BUNDLE)",a.webrtc);
     connect(web,&QCheckBox::toggled,this,[this](bool on){if(on){check_["ice"]->setChecked(true);encryption_->setCurrentIndex(encryption_->findData("dtls"));}});
     auto *webNote=new QLabel("This profile enables SIP-to-WebRTC media interoperability through a compatible PBX/gateway. Direct browser signalling, WSS and SCTP data channels are not provided by this backend.");webNote->setWordWrap(true);nat->addRow(webNote);
-    auto *forward=form("Forwarding");edit(forward,"forwardTo","Forward incoming calls to",a.forwardTo)->setPlaceholderText("Blank = off; extension or SIP URI");
+    auto *forward=form("Forwarding",NavigationIcon::Forward);edit(forward,"forwardTo","Forward incoming calls to",a.forwardTo)->setPlaceholderText("Blank = off; extension or SIP URI");
     check(forward,"forwardBusy","Forward only when busy / DND",a.forwardBusy);
     auto *forwardNote=new QLabel("Uses SIP 302 redirection while Stel is running. The PBX must permit redirects. Always-on forwarding while the app is offline must be configured on the PBX.");forwardNote->setWordWrap(true);forward->addRow(forwardNote);
     for(auto *e:text_)connect(e,&QLineEdit::textChanged,this,[this]{dirty_=true;emit edited();});

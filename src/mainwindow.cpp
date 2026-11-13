@@ -47,7 +47,8 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
     callAccountBar_=new QWidget;accountRow->setContentsMargins(0,0,0,0);callAccountBar_->setLayout(accountRow);layout->addWidget(callAccountBar_);
     status_=new QLabel("Starting call engine…");status_->setObjectName("accountStatus");layout->addWidget(status_);
     tabs_=new QTabWidget;tabs_->setObjectName("mainPages");layout->addWidget(tabs_,1);
-    tabs_->addTab(createPhone(),"Phone");chat_=new ChatWidget(engine_,store_);tabs_->addTab(chat_,"Messages");tabs_->addTab(createContacts(),"Contacts");tabs_->addTab(createHistory(),"Recent calls");
+    tabs_->addTab(createPhone(),navigationIcon(NavigationIcon::Phone),"Phone");chat_=new ChatWidget(engine_,store_);tabs_->addTab(chat_,navigationIcon(NavigationIcon::Messages),"Messages");tabs_->addTab(createContacts(),navigationIcon(NavigationIcon::Contacts),"Contacts");tabs_->addTab(createHistory(),navigationIcon(NavigationIcon::History),"Recent calls");
+    styleNavigationTabs(tabs_,NavigationLevel::Primary);
     connect(chat_,&ChatWidget::settingsRequested,this,&MainWindow::showSettings);
     const auto updateUnread=[this](int count){tabs_->setTabText(tabs_->indexOf(chat_),count?"Messages ("+QString::number(count)+")":"Messages");};
     connect(chat_,&ChatWidget::unreadCountChanged,this,updateUnread);updateUnread(chat_->unreadCount());

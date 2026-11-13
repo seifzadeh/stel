@@ -1,6 +1,6 @@
 # Stel — سافت‌فون Qt/C++
 
-نسخهٔ ۰.۷.۰ با Qt Widgets و liblinphone 5.3.105. مسیر این پروژه
+نسخهٔ ۰.۷.۱ با Qt Widgets و liblinphone 5.3.105. مسیر این پروژه
 `/home/dev/codes/stel` است. برنامه به‌صورت پیش‌فرض هیچ اکانتی ایجاد نمی‌کند و
 به سروری وصل نمی‌شود؛ اکانت را از Settings → Accounts → Add account وارد کنید.
 

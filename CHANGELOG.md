@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1 — 2026-11-13
+
+- Restyle the main navigation, Settings categories and account/license subtabs
+  with rounded tabs, matching line icons and clear selected/hover/focus states.
+- Draw navigation icons with Qt at the requested resolution for high-DPI displays,
+  without adding an icon-font or image-plugin dependency. Retain the LTR layout.
+
 ## 0.7.0 — 2026-11-13
 
 - Add Messages as the second main tab, with per-account SIP MESSAGE conversations,
