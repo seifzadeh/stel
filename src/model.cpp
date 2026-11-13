@@ -7,11 +7,32 @@
 #include <QHostAddress>
 #include <QNetworkInterface>
 #include <QSaveFile>
+#include <QSet>
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QUuid>
 
 namespace stel {
+QJsonObject MessageInfo::toJson() const {
+    return {{"id",id},{"accountId",accountId},{"peer",peer},{"peerName",peerName},{"text",text},
+        {"state",state},{"error",error},{"timestamp",timestamp.toUTC().toString(Qt::ISODateWithMs)},
+        {"incoming",incoming},{"unread",unread},{"sipStatus",sipStatus}};
+}
+MessageInfo MessageInfo::fromJson(const QJsonObject &o) {
+    MessageInfo m;m.id=o["id"].toString();m.accountId=o["accountId"].toString();m.peer=o["peer"].toString();
+    m.peerName=o["peerName"].toString();m.text=o["text"].toString();m.state=o["state"].toString();m.error=o["error"].toString();
+    m.timestamp=QDateTime::fromString(o["timestamp"].toString(),Qt::ISODateWithMs);
+    m.incoming=o["incoming"].toBool();m.unread=o["unread"].toBool();m.sipStatus=o["sipStatus"].toInt();return m;
+}
+QString messageStateLabel(const MessageInfo &m) {
+    if(m.incoming)return "Received";
+    if(m.state=="sending")return "Sending…";
+    if(m.state=="sent")return "Sent";
+    if(m.state=="delivered")return "Delivered";
+    if(m.state=="read")return "Read";
+    if(m.state=="interrupted")return "Send interrupted — delivery unknown";
+    return "Not sent";
+}
 QString mediaSecurityLabel(const QString &mode){if(mode=="none")return "RTP";if(mode=="dtls")return "DTLS-SRTP";return mode.toUpper();}
 QJsonObject Account::toJson() const {
     return {{"id",id},{"label",label},{"callerIdName",callerIdName},{"autoAnswer",autoAnswer},{"username",username},{"domain",domain},{"server",server},
@@ -164,6 +185,32 @@ bool Store::saveContacts(const QVector<QJsonObject> &contacts) const {
     QJsonArray list; for(const auto &v:contacts)list.append(v);
     QSaveFile f(directory_+"/contacts.json"); if(!f.open(QIODevice::WriteOnly))return false;
     f.setPermissions(QFile::ReadOwner|QFile::WriteOwner); f.write(QJsonDocument(list).toJson()); return f.commit();
+}
+bool Store::loadMessages(QVector<MessageInfo> &messages,QString *error) const {
+    QFile file(directory_+"/messages.json");if(!file.exists()){messages.clear();return true;}
+    if(!file.open(QIODevice::ReadOnly)){if(error)*error=file.errorString();return false;}
+    QJsonParseError parse;const auto doc=QJsonDocument::fromJson(file.readAll(),&parse);
+    if(parse.error!=QJsonParseError::NoError||!doc.isObject()||doc["schema"].toInt()!=1||!doc["messages"].isArray()){
+        if(error)*error="Message history is invalid; the original file has been preserved.";
+        return false;
+    }
+    QVector<MessageInfo> loaded;QSet<QString> ids;
+    for(const auto &value:doc["messages"].toArray()){
+        const auto message=MessageInfo::fromJson(value.toObject());
+        if(message.id.isEmpty()||message.accountId.isEmpty()||message.peer.isEmpty()||!message.timestamp.isValid()||ids.contains(message.id)){
+            if(error)*error="Message history contains an invalid entry; the original file has been preserved.";
+            return false;
+        }
+        ids.insert(message.id);loaded.append(message);
+    }
+    messages=loaded;return true;
+}
+bool Store::saveMessages(const QVector<MessageInfo> &messages,QString *error) const {
+    QJsonArray list;for(const auto &message:messages)list.append(message.toJson());
+    QSaveFile file(directory_+"/messages.json");if(!file.open(QIODevice::WriteOnly)){if(error)*error=file.errorString();return false;}
+    file.setPermissions(QFile::ReadOwner|QFile::WriteOwner);
+    const auto data=QJsonDocument(QJsonObject{{"schema",1},{"messages",list}}).toJson();
+    if(file.write(data)!=data.size()||!file.commit()){if(error)*error=file.errorString();return false;}return true;
 }
 QString normalizeTarget(const QString &target, const QString &domain) {
     QString s=target.trimmed();

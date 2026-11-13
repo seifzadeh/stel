@@ -40,6 +40,8 @@ public:
     QString networkDescription(const QString &accountId = {}) const;
     bool applyNetwork(const Preferences &);
     bool dial(const QString &accountId, const QString &target, bool video = false);
+    QString messageTarget(const QString &accountId,const QString &target) const;
+    QString sendMessage(const QString &accountId,const QString &target,const QString &text);
     bool answer(const QString &, bool video);
     bool hangup(const QString &);
     bool hold(const QString &, bool held);
@@ -72,6 +74,7 @@ signals:
     void callFinished(const stel::CallInfo &info);
     void errorOccurred(const QString &message);
     void notification(const QString &message);
+    void messageChanged(const stel::MessageInfo &message);
 private:
     struct AccountHandle { Account config; LinphoneAccount *account = nullptr; LinphoneAuthInfo *auth = nullptr; LinphoneAuthInfo *turnAuth = nullptr; };
     LinphoneCore *core_ = nullptr;
@@ -81,6 +84,8 @@ private:
     QHash<LinphoneCall*,QString> callIds_;
     QSet<LinphoneCall*> localPeerCalls_;
     QHash<QString,SipEngine*> certificateCores_;
+    struct PendingMessage { MessageInfo info; LinphoneChatMessageCbs *callbacks=nullptr; };
+    QHash<LinphoneChatMessage*,PendingMessage> messages_;
     bool certificateLeaf_ = false, testMode_ = false;
     bool muted_ = false;
     quintptr remoteWindow_ = 0, previewWindow_ = 0;
@@ -106,6 +111,10 @@ private:
     static void registrationCb(LinphoneCore *, LinphoneAccount *, LinphoneRegistrationState, const char *);
     static void callCb(LinphoneCore *, LinphoneCall *, LinphoneCallState, const char *);
     static void transferCb(LinphoneCore *, LinphoneCall *, LinphoneCallState);
+    static void messageReceivedCb(LinphoneCore *,LinphoneChatRoom *,LinphoneChatMessage *);
+    static void messageStateCb(LinphoneChatMessage *,LinphoneChatMessageState);
+    void releaseMessage(LinphoneChatMessage *);
 };
 }
 Q_DECLARE_METATYPE(stel::CallInfo)
+Q_DECLARE_METATYPE(stel::MessageInfo)

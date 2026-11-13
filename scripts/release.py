@@ -30,6 +30,8 @@ def source_archive(output, root=ROOT):
         parts = Path(item.name).parts
         if any(p in ('.git', '.secrets', '__pycache__', 'node_modules') for p in parts):
             return None
+        if Path(item.name).name in ('messages.json', 'settings.json', 'instance.lock'):
+            return None
         if item.issym() or item.islnk():
             raise ValueError(f'Unexpected link in source tree: {item.name}')
         if item.name.endswith(('.pyc', '.log', '.key', '.pem', '.env')):

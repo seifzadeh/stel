@@ -35,7 +35,18 @@ int main(int argc,char **argv) {
     if(accountList.isEmpty())accountList.append(o["account"]);
     QSet<QString> registered;
     QTemporaryDir tmp;stel::SipEngine engine;
-    const bool callMode=o["call"].toBool();bool dialed=false;
+    const bool callMode=o["call"].toBool(),messageMode=o["message"].toBool();bool dialed=false;
+    const auto messageText=QString::fromUtf8("سلام از حساب TLS — پیام فارسی با نیم‌فاصله 👋 / SIP 123");
+    QSet<QString> receivedMessages;
+    QObject::connect(&engine,&stel::SipEngine::messageChanged,&app,[&](const stel::MessageInfo &m){
+        if(!messageMode)return;
+        if(m.state=="failed"){app.exit(5);return;}
+        if(m.incoming){
+            if(m.text!=messageText){app.exit(6);return;}receivedMessages.insert(m.accountId);
+            if(m.accountId=="bob")QTimer::singleShot(0,&app,[&]{if(engine.sendMessage("bob","alice",messageText).isEmpty())app.exit(5);});
+            if(receivedMessages==QSet<QString>{"test","bob"}){QTextStream(stdout)<<"MESSAGE_OK: distinct mTLS accounts exchanged exact UTF-8"<<Qt::endl;QTimer::singleShot(100,&app,[&]{app.exit(0);});}
+        }
+    });
     QObject::connect(&engine,&stel::SipEngine::errorOccurred,&app,[](const QString &e){QTextStream(stdout)<<"ERROR "<<e<<Qt::endl;});
     QObject::connect(&engine,&stel::SipEngine::accountState,&app,[&](const QString &id,const QString &state,const QString &){
         QTextStream(stdout)<<state<<Qt::endl;
@@ -43,7 +54,8 @@ int main(int argc,char **argv) {
             registered.insert(id);
             if(registered.size()==accountList.size()) {
                 if(callMode && !dialed){dialed=true;QTimer::singleShot(0,&app,[&]{if(!engine.dial(accountList[0].toObject()["id"].toString(),"sip:bob@localhost"))app.exit(4);});}
-                else if(!callMode)QTimer::singleShot(50,&app,[&]{app.exit(0);});
+                else if(messageMode&&!dialed){dialed=true;QTimer::singleShot(0,&app,[&]{if(engine.sendMessage("test","bob",messageText).isEmpty())app.exit(5);});}
+                else if(!callMode&&!messageMode)QTimer::singleShot(50,&app,[&]{app.exit(0);});
             }
         }
         if(state=="LinphoneRegistrationFailed")QTimer::singleShot(50,&app,[&]{app.exit(1);});

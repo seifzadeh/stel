@@ -18,7 +18,8 @@ public:
     quint16 port() const {return socket_.localPort();}
     QString server() const {return "sip:127.0.0.1:"+QString::number(port());}
     bool registered(const QString &user) const {return bindings_.contains(user);}
-    int invites=0,answers=0;
+    int invites=0,answers=0,rejectedMessages=0;
+    QList<QByteArray> messageBodies,messageFrom,messageTo,messageContentTypes;
     bool bareRequestUri=true;
 private:
     struct Dialog {QString a,b,aId,bId;};
@@ -64,6 +65,25 @@ private:
                 const auto contact=header(lines,"contact");if(!contact.isEmpty()){const auto name=user(contact).isEmpty()?user(header(lines,"to")):user(contact);lines=replace(lines,"contact",("<sip:"+name+"@127.0.0.1:"+QString::number(this->port())+">").toUtf8());}
                 if(lines[0].startsWith("SIP/2.0 200")&&header(lines,"cseq").endsWith("INVITE"))++answers;
                 send(lines,body,transaction.address,transaction.port);continue;
+            }
+            if(lines[0].startsWith("MESSAGE ")){
+                if(header(lines,"content-type").startsWith("text/plain")){
+                    messageBodies<<body;messageFrom<<header(lines,"from");messageTo<<header(lines,"to");messageContentTypes<<header(lines,"content-type");
+                }
+                const auto destination=bindings_.value(user(header(lines,"to")));
+                if(!destination.port){
+                    ++rejectedMessages;
+                    QList<QByteArray> response{"SIP/2.0 404 Not Found"};
+                    for(const auto &key:{"via","from","to","call-id","cseq"})response<<QByteArray(key)+": "+header(lines,key)+(QByteArray(key)=="to"?";tag=missing":"");
+                    response<<"Content-Length: 0";send(response,{},address,port);continue;
+                }
+                const auto branch="z9hG4bK-message-"+QUuid::createUuid().toString(QUuid::WithoutBraces);
+                QList<QByteArray> vias;for(const auto &line:lines)if(line.toLower().startsWith("via:"))vias<<line;
+                transactions_[branch]={address,port,id.toUtf8(),vias};
+                auto target=destination.contact;if(bareRequestUri)target.replace(QRegularExpression("(?<=sip:)[^@]+@"),"");
+                lines[0]="MESSAGE "+target.toUtf8()+" SIP/2.0";lines=replace(lines,"route",{});
+                lines=replace(lines,"via",("SIP/2.0/UDP 127.0.0.1:"+QString::number(this->port())+";branch="+branch).toUtf8());
+                send(lines,body,destination.address,destination.port);continue;
             }
             if(!dialogs_.contains(id)) {
                 if(!lines[0].startsWith("INVITE "))continue;

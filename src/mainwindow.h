@@ -15,6 +15,7 @@ class QCloseEvent;
 namespace stel {
 class SettingsWidget;
 class CallDialog;
+class ChatWidget;
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
@@ -40,6 +41,7 @@ private:
     QSystemTrayIcon *tray_ = nullptr;
     QTabWidget *tabs_ = nullptr;
     SettingsWidget *settings_ = nullptr;
+    ChatWidget *chat_ = nullptr;
     QDialog *settingsDialog_ = nullptr;
     QWidget *callAccountBar_ = nullptr;
     QHash<QString,CallInfo> callCache_;

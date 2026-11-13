@@ -44,7 +44,7 @@ class ReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / 'CMakeLists.txt').write_text('project(Stel VERSION 1.2.3 LANGUAGES C CXX)')
-            for file in ('src/main.cpp', 'cmake/StelLinphoneSdk.cmake', 'src/private.key', 'src/.secrets/pbx.env',
+            for file in ('src/main.cpp', 'src/messages.json', 'src/settings.json', 'cmake/StelLinphoneSdk.cmake', 'src/private.key', 'src/.secrets/pbx.env',
                          'tests/__pycache__/cached.pyc', '.secrets/pbx.env', 'build/stel',
                          '.github/workflows/build.yml', 'website/index.html', 'LICENSES/AGPL-3.0.txt'):
                 p = root / file;p.parent.mkdir(parents=True, exist_ok=True);p.write_text('fixture')
@@ -55,6 +55,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertIn('Stel-1.2.3/cmake/StelLinphoneSdk.cmake', names)
             self.assertIn('Stel-1.2.3/.github/workflows/build.yml', names)
             self.assertFalse(any('.secrets' in n or 'private.key' in n or '__pycache__' in n or '/build/' in n for n in names))
+            self.assertFalse(any(n.endswith(('/messages.json', '/settings.json')) for n in names))
 
     def test_metadata_rejects_mismatching_tag(self):
         proc = subprocess.run([sys.executable, str(ROOT / 'scripts/release.py'), 'metadata',

@@ -1,5 +1,6 @@
 #pragma once
 #include <QJsonObject>
+#include <QDateTime>
 #include <QString>
 #include <QStringList>
 #include <QVector>
@@ -36,6 +37,16 @@ struct Preferences {
 };
 struct LocalAddress { QString address, interfaceName; };
 QVector<LocalAddress> localAddresses();
+struct MessageInfo {
+    QString id, accountId, peer, peerName, text;
+    QString state, error;
+    QDateTime timestamp;
+    bool incoming=false, unread=false;
+    int sipStatus=0;
+    QJsonObject toJson() const;
+    static MessageInfo fromJson(const QJsonObject &);
+};
+QString messageStateLabel(const MessageInfo &);
 class Store {
 public:
     explicit Store(QString directory = {});
@@ -46,6 +57,8 @@ public:
     QVector<QJsonObject> history() const;
     QVector<QJsonObject> contacts() const;
     bool saveContacts(const QVector<QJsonObject> &) const;
+    bool loadMessages(QVector<MessageInfo> &, QString *error=nullptr) const;
+    bool saveMessages(const QVector<MessageInfo> &, QString *error=nullptr) const;
 private:
     QString directory_;
     mutable QByteArray credentialSnapshot_;

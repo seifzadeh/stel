@@ -3,6 +3,10 @@
 #include "calldialog.h"
 #include "settingswidget.h"
 #include "minipbx.h"
+#include "chatwidget.h"
+#include <QInputMethodEvent>
+#include <QScrollArea>
+#include <QTextOption>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
@@ -54,6 +58,53 @@ class UiTests:public QObject {
     }
 private slots:
     void init(){IsolatedSipEngine::resetPortPools();}
+    void messagesChatPersianAndRestart(){
+        QTemporaryDir tmp;MiniPbx pbx;stel::Store store(tmp.path());stel::Preferences prefs;
+        prefs.inputDevice=stel::dummyMicSilence();prefs.outputDevice=stel::dummySpeaker();QVector<stel::Account> accounts;
+        for(const auto &id:{"alice","bob"}){auto a=direct(id);a.server=pbx.server();a.registerEnabled=true;a.password="message-ui-test-secret";accounts<<a;}
+        QString error;QVERIFY2(store.save(accounts,prefs,&error),qPrintable(error));
+        const auto body=QString::fromUtf8("سلام، می‌توانم فارسی تایپ کنم 👋\nSIP 62223 / شماره ۱۲۳۴ <b>متن ساده</b>");
+        const auto reply=QString::fromUtf8("بله، پیام شما رسید ✅ — received 123");
+        {
+            stel::MainWindow window(tmp.path());QVERIFY(window.ready());window.show();QCOMPARE(window.layoutDirection(),Qt::LeftToRight);
+            QTRY_VERIFY_WITH_TIMEOUT(pbx.registered("alice")&&pbx.registered("bob"),6000);
+            auto *tabs=window.findChild<QTabWidget*>("mainPages");QCOMPARE(tabs->tabText(0),QString("Phone"));QCOMPARE(tabs->tabText(1),QString("Messages"));tabs->setCurrentIndex(1);
+            auto *page=window.findChild<stel::ChatWidget*>();QVERIFY(page);QCOMPARE(page->layoutDirection(),Qt::LeftToRight);
+            auto *account=page->findChild<QComboBox*>("messageAccount");auto *recipient=page->findChild<QLineEdit*>("messageRecipient");
+            auto *composer=page->findChild<QPlainTextEdit*>("messageComposer");QVERIFY(composer);QCOMPARE(composer->document()->defaultTextOption().textDirection(),Qt::LayoutDirectionAuto);
+            account->setCurrentIndex(account->findData("alice"));recipient->setText("bob");composer->setFocus();
+            QInputMethodEvent input;input.setCommitString(body);QApplication::sendEvent(composer,&input);QCOMPARE(composer->toPlainText(),body);
+            QTest::keyClick(composer,Qt::Key_Return,Qt::ShiftModifier);QCOMPARE(composer->toPlainText(),body+'\n');
+            QTest::keyClick(composer,Qt::Key_Return);QVERIFY(composer->toPlainText().isEmpty());
+            QVector<stel::MessageInfo> messages;auto load=[&]{messages.clear();return store.loadMessages(messages)&&messages.size()==2;};
+            QTRY_VERIFY_WITH_TIMEOUT(load(),6000);QCOMPARE(pbx.messageBodies.first(),(body+'\n').toUtf8());QCOMPARE(page->unreadCount(),1);
+            auto *list=page->findChild<QListWidget*>("messageConversations");QCOMPARE(list->count(),2);QListWidgetItem *bob=nullptr;
+            for(int n=0;n<list->count();++n)if(list->item(n)->data(Qt::UserRole).toString()=="bob")bob=list->item(n);
+            QVERIFY(bob);list->setCurrentItem(bob);QCOMPARE(account->currentData().toString(),QString("bob"));QCOMPARE(page->unreadCount(),0);
+            auto *timeline=page->findChild<QScrollArea*>("messageTimeline");auto bodies=timeline->widget()->findChildren<QLabel*>("messageBody");QCOMPARE(bodies.size(),1);
+            QCOMPARE(bodies[0]->text(),body+'\n');QCOMPARE(bodies[0]->textFormat(),Qt::PlainText);
+            composer->setPlainText(reply);QTest::keyClick(composer,Qt::Key_Return);QTRY_COMPARE_WITH_TIMEOUT(pbx.messageBodies.size(),2,6000);
+            QTRY_VERIFY_WITH_TIMEOUT(store.loadMessages(messages)&&messages.size()==4,6000);QCOMPARE(page->unreadCount(),1);
+            QVERIFY(pbx.messageFrom.last().contains("bob@"));screenshot(window,"messages-persian-chat");
+            account->setCurrentIndex(account->findData("alice"));recipient->setText("bob");const QString oversized(32769,'x');composer->setPlainText(oversized);
+            const int accepted=pbx.messageBodies.size();button(*page,"sendMessage")->click();QCOMPARE(composer->toPlainText(),oversized);QCOMPARE(pbx.messageBodies.size(),accepted);
+            recipient->setText("missing");composer->setPlainText("This recipient does not exist");button(*page,"sendMessage")->click();
+            auto failed=[&]{if(!store.loadMessages(messages))return false;for(const auto &m:messages)if(m.state=="failed")return true;return false;};
+            QTRY_VERIFY_WITH_TIMEOUT(failed(),6000);QTRY_VERIFY_WITH_TIMEOUT(timeline->widget()->findChild<QPushButton*>("retryMessage"),3000);
+            const int before=pbx.messageBodies.size();timeline->widget()->findChild<QPushButton*>("retryMessage")->click();QTRY_COMPARE_WITH_TIMEOUT(pbx.messageBodies.size(),before+1,6000);
+            tabs->setCurrentIndex(0);auto *engine=window.findChild<stel::SipEngine*>();QVERIFY(engine);
+            QVERIFY(!engine->sendMessage("bob","alice",reply).isEmpty());
+            auto unreadWhileCalling=[&]{if(!store.loadMessages(messages))return false;int count=0;for(const auto &m:messages)count+=m.incoming;return count==3&&page->unreadCount()>=1;};
+            QTRY_VERIFY_WITH_TIMEOUT(unreadWhileCalling(),6000);QCOMPARE(tabs->currentIndex(),0);
+        }
+        {
+            stel::MainWindow restarted(tmp.path());QVERIFY(restarted.ready());restarted.show();auto *page=restarted.findChild<stel::ChatWidget*>();QVERIFY(page->unreadCount()>=1);
+            QVector<stel::MessageInfo> messages;QVERIFY(store.loadMessages(messages));int incoming=0;
+            for(const auto &m:messages)if(m.incoming){++incoming;QVERIFY(m.text==body+'\n'||m.text==reply);}
+            QCOMPARE(incoming,3);
+        }
+        QVERIFY(store.save({},prefs));
+    }
     void aboutShowsReleaseAndCredits() {
         QTemporaryDir tmp;stel::MainWindow window(tmp.path());QVERIFY(window.ready());window.show();window.showSettings();
         auto *pages=window.findChild<QTabWidget*>("settingsPages");QVERIFY(pages);auto *page=window.findChild<QWidget*>("aboutPage");QVERIFY(page);
@@ -279,7 +330,7 @@ private slots:
         window->showSettings();auto *dialog=window->findChild<QDialog*>("settingsDialog");QVERIFY(dialog&&dialog->isVisible());
         QVERIFY(window->findChild<QCheckBox*>("rememberPassword")->isChecked());
         screenshot(*window,"accounts-two-registered");
-        auto *mainPages=window->findChild<QTabWidget*>("mainPages");QCOMPARE(mainPages->count(),3);
+        auto *mainPages=window->findChild<QTabWidget*>("mainPages");QCOMPARE(mainPages->count(),4);
         dialog->close();QVERIFY(window->isVisible());QVERIFY(!dialog->isVisible());QVERIFY(registered());QVERIFY(unregistered.isEmpty());
         auto close=[&](QMessageBox::StandardButton answer){QTimer::singleShot(0,window.get(),[&]{auto *question=window->findChild<QMessageBox*>("confirmExit");QVERIFY(question);screenshot(*question,"confirm-exit");question->button(answer)->click();});window->close();};
         close(QMessageBox::Cancel);QVERIFY(window->isVisible());QVERIFY(registered());

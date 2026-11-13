@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0 — 2026-11-13
+
+- Add Messages as the second main tab, with per-account SIP MESSAGE conversations,
+  incoming/outgoing bubbles, local history, unread badges and send/failure states.
+- Preserve the LTR interface while handling Persian shaping, bidirectional mixed
+  text, ZWNJ, emoji and multiline UTF-8 input. Enter sends; Shift+Enter adds a line.
+- Keep drafts per conversation and show failed sends with an explicit retry.
+- Verify exact UTF-8 payloads between accounts in one core, independent cores and
+  separate mutually authenticated TLS cores, plus chat persistence and UI input.
+
 ## 0.6.0 — 2026-11-09
 
 - Settings → About shows the application/SDK/Qt versions, principal developer

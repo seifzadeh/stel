@@ -5,6 +5,7 @@
 #include <QSslCertificate>
 #include <QSslConfiguration>
 #include <QSet>
+#include <QCryptographicHash>
 #include <QUuid>
 #include <belr/grammarbuilder.h>
 #include <mediastreamer2/msfactory.h>
@@ -46,6 +47,7 @@ static LinphoneMediaEncryption encryption(const QString &s) {
 }
 SipEngine::SipEngine(QObject *parent) : QObject(parent) {
     qRegisterMetaType<stel::CallInfo>();
+    qRegisterMetaType<stel::MessageInfo>();
     iterate_.setInterval(20);
     connect(&iterate_,&QTimer::timeout,this,[this]{ if(core_)linphone_core_iterate(core_); });
 }
@@ -55,6 +57,12 @@ void SipEngine::shutdown() {
     // Children must stop while the composite engine and its signal state live.
     const auto children=certificateCores_;certificateCores_.clear();for(auto *child:children)delete child;
     if(core_) {
+        const auto pending=messages_.keys();
+        for(auto *message:pending){
+            auto info=messages_[message].info;
+            if(info.state=="sending"){info.state="interrupted";info.error="The application closed before the send result was received.";emit messageChanged(info);}
+            releaseMessage(message);
+        }
         linphone_core_stop(core_);
         for(auto *c:calls_)linphone_call_unref(c);
         calls_.clear(); callIds_.clear();localPeerCalls_.clear();
@@ -149,6 +157,7 @@ bool SipEngine::start(const Preferences &prefs,const QString &directory,bool tes
     linphone_core_cbs_set_account_registration_state_changed(cb,registrationCb);
     linphone_core_cbs_set_call_state_changed(cb,callCb);
     linphone_core_cbs_set_transfer_state_changed(cb,transferCb);
+    linphone_core_cbs_set_message_received(cb,messageReceivedCb);
     linphone_core_add_callbacks(core_,cb); linphone_core_cbs_unref(cb);
     linphone_core_set_user_agent(core_,"Stel",STEL_VERSION);
     linphone_core_verify_server_certificates(core_,TRUE);
@@ -231,6 +240,7 @@ bool SipEngine::addAccount(const Account &a) {
         connect(child,&SipEngine::accountState,this,&SipEngine::accountState);
         connect(child,&SipEngine::callChanged,this,&SipEngine::callChanged);
         connect(child,&SipEngine::callFinished,this,&SipEngine::callFinished);
+        connect(child,&SipEngine::messageChanged,this,&SipEngine::messageChanged);
         connect(child,&SipEngine::notification,this,&SipEngine::notification);
         connect(child,&SipEngine::errorOccurred,this,[this](const QString &s){fail(s);});
         if(!child->start(childPrefs,dataDirectory_+"/accounts/"+a.id,testMode_) || !child->addAccount(a)) {

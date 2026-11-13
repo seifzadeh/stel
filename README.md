@@ -12,6 +12,13 @@ Caller ID Name, audio/video codec preferences, network binding and dummy devices
 for testing without a physical microphone or camera. Settings → About shows the
 application version and dependency credits.
 
+The second tab, **Messages**, provides SIP MESSAGE chat for each account. It keeps
+local conversation history, unread counts and send results. The interface stays
+LTR; Persian, mixed Persian/English text, ZWNJ, emoji and multiline text use Qt's
+Unicode text handling. Enter sends and Shift+Enter inserts a newline. Messaging
+requires support from the SIP peer/PBX; a server acknowledgement is labelled
+**Sent**, not read by the recipient. This is SIP messaging, not a cellular SMS gateway.
+
 SIP UDP/TCP/TLS and client-certificate authentication are supported. New accounts
 use RTP; SRTP is an explicit account setting. WebRTC-compatible media settings are
 available for compatible SIP gateways; generic WSS signalling and SIP-over-SCTP

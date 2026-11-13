@@ -5,6 +5,7 @@
 #include "settingswidget.h"
 #include "secretstore.h"
 #include "branding.h"
+#include "chatwidget.h"
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
@@ -34,6 +35,7 @@
 
 namespace stel {
 MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(parent),store_(directory),engine_(this) {
+    setLayoutDirection(Qt::LeftToRight);
     setWindowTitle("Stel • Softphone");setMinimumSize(790,620);resize(980,730);
     setWindowIcon(applicationIcon());
     auto *root=new QWidget;setCentralWidget(root);auto *layout=new QVBoxLayout(root);layout->setContentsMargins(22,18,22,12);layout->setSpacing(14);
@@ -45,7 +47,11 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
     callAccountBar_=new QWidget;accountRow->setContentsMargins(0,0,0,0);callAccountBar_->setLayout(accountRow);layout->addWidget(callAccountBar_);
     status_=new QLabel("Starting call engine…");status_->setObjectName("accountStatus");layout->addWidget(status_);
     tabs_=new QTabWidget;tabs_->setObjectName("mainPages");layout->addWidget(tabs_,1);
-    tabs_->addTab(createPhone(),"Phone");tabs_->addTab(createContacts(),"Contacts");tabs_->addTab(createHistory(),"Recent calls");
+    tabs_->addTab(createPhone(),"Phone");chat_=new ChatWidget(engine_,store_);tabs_->addTab(chat_,"Messages");tabs_->addTab(createContacts(),"Contacts");tabs_->addTab(createHistory(),"Recent calls");
+    connect(chat_,&ChatWidget::settingsRequested,this,&MainWindow::showSettings);
+    const auto updateUnread=[this](int count){tabs_->setTabText(tabs_->indexOf(chat_),count?"Messages ("+QString::number(count)+")":"Messages");};
+    connect(chat_,&ChatWidget::unreadCountChanged,this,updateUnread);updateUnread(chat_->unreadCount());
+    connect(tabs_,&QTabWidget::currentChanged,this,[this]{const bool phoneContext=tabs_->currentWidget()!=chat_;callAccountBar_->setVisible(phoneContext);status_->setVisible(phoneContext);});
     log_=new QPlainTextEdit;log_->setReadOnly(true);log_->setMaximumBlockCount(150);log_->setMaximumHeight(105);log_->setPlaceholderText("Registration and call events");log_->hide();
     auto *showLog=new QCheckBox("Show events");layout->addWidget(showLog);layout->addWidget(log_);connect(showLog,&QCheckBox::toggled,log_,&QWidget::setVisible);
     connect(&engine_,&SipEngine::errorOccurred,this,[this](const QString &s){appendLog(s);statusBar()->showMessage(s,15000);});
@@ -166,6 +172,7 @@ void MainWindow::appendLog(const QString &s){if(log_)log_->appendPlainText(QTime
 QString MainWindow::selectedCall()const {auto *item=calls_->currentItem();return item?item->data(Qt::UserRole).toString():QString();}
 void MainWindow::save(){QString error;if(!settingsValid_){statusBar()->showMessage("Settings were not overwritten because the original file is invalid.");return;}if(!store_.save(accounts_,prefs_,&error))appendLog(error);}
 void MainWindow::rebuildAccounts(){
+    chat_->setAccounts(accounts_);
     const auto selected=accountBox_->currentData().toString();accountBox_->blockSignals(true);accountBox_->clear();
     for(const auto &a:accounts_)accountBox_->addItem((a.label.isEmpty()?a.username+'@'+a.domain:a.label)+"  ·  "+registrationLabel(accountStates_.value(a.id,a.enabled?"Unregistered":"Disabled")),a.id);
     accountBox_->setCurrentIndex(qMax(0,accountBox_->findData(selected)));accountBox_->blockSignals(false);

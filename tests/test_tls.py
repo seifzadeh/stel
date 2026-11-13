@@ -193,7 +193,7 @@ class Registrar:
 
 
 def run_case(binary, directory, name, *, cert='server', ca='ca', client=True,
-             password='local-test-secret', expect=False, multiple=False, call=False, codec=''):
+             password='local-test-secret', expect=False, multiple=False, call=False, codec='', message=False):
     registrar = Registrar(directory, cert)
     try:
         account = {'id': 'test', 'username': 'alice', 'domain': 'localhost',
@@ -207,7 +207,7 @@ def run_case(binary, directory, name, *, cert='server', ca='ca', client=True,
         if multiple:
             accounts.append({**account, 'id': 'bob', 'username': 'bob',
                              'certificate': str(directory / 'bob.pem'), 'privateKey': str(directory / 'bob.key')})
-        config.write_text(json.dumps({'accounts': accounts, 'call': call,
+        config.write_text(json.dumps({'accounts': accounts, 'call': call, 'message': message,
                                       'audioCodecId': codec, 'requireCodec': 'G729/8000' if codec else '',
                                       'preferences': {'caFile': str(directory / f'{ca}.pem')}}))
         tone = directory / 'tone.wav'
@@ -225,6 +225,8 @@ def run_case(binary, directory, name, *, cert='server', ca='ca', client=True,
                 assert registrar.identities == {'alice', 'bob'}, registrar.identities
             if call:
                 assert registrar.forwarded_invites >= 1 and 'CALL_OK' in result.stdout
+            if message:
+                assert 'MESSAGE_OK' in result.stdout, result.stdout + result.stderr[-5000:]
         else:
             assert result.returncode != 0 and not registrar.registered, 'An invalid peer/credential was accepted!'
         print(f'PASS {name}: exit={result.returncode}, client_certificate_verified={registrar.client_verified}, registered={registrar.registered}', flush=True)
@@ -239,6 +241,7 @@ if __name__ == '__main__':
         certificates(directory)
         run_case(binary, directory, 'mutual_tls_and_digest', expect=True)
         run_case(binary, directory, 'two_accounts_distinct_certificates', multiple=True, expect=True)
+        run_case(binary, directory, 'persian_messages_over_distinct_mtls_accounts', multiple=True, message=True, expect=True)
         run_case(binary, directory, 'mutual_tls_srtp_call', multiple=True, call=True, expect=True)
         inventory = subprocess.run([binary, '--codecs'], capture_output=True, text=True, timeout=10).stdout
         if 'AUDIO G729/8000/1' in inventory:

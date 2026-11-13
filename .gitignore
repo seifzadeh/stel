@@ -11,6 +11,7 @@
 .env.*
 !.env.example
 settings.json
+messages.json
 instance.lock
 *.user
 *.pem
