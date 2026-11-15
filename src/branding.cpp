@@ -38,6 +38,10 @@ public:
         p->setPen(QPen(color,1.75,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));p->setBrush(Qt::NoBrush);
         QPainterPath path;
         switch(icon_){
+        case NavigationIcon::Fax:
+            p->drawRoundedRect(QRectF(3,8,18,13),2,2);p->drawRect(QRectF(7,2.5,11,7));
+            p->drawLine(QPointF(7,14),QPointF(17,14));p->drawLine(QPointF(7,17),QPointF(13,17));
+            p->drawLine(QPointF(5,11),QPointF(6,11));break;
         case NavigationIcon::Phone:
             path.moveTo(7.2,3.5);path.lineTo(4.8,3.5);path.quadTo(3,3.5,3.3,5.5);path.cubicTo(4.2,13.6,10.4,19.8,18.5,20.7);
             path.quadTo(20.5,21,20.5,19.2);path.lineTo(20.5,16.8);path.lineTo(15.8,14.6);path.lineTo(13.5,16.6);

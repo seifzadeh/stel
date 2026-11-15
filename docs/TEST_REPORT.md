@@ -1,4 +1,8 @@
-# Stel 0.6.0 — release-ready repository and About
+# Stel test reports
+
+Latest feature validation: [0.9.0 — text and PDF fax input](TEST_REPORT_0.9.0.md).
+
+## Stel 0.6.0 — release-ready repository and About
 
 Settings → About displays the application version, runtime Qt/liblinphone
 versions, principal developer Mehrdad Seifzadeh, contact/project/site links,

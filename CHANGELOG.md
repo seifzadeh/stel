@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.9.0 — 2026-11-15
+
+- Send typed text, TXT and multipage PDF directly from the Fax tab; retain
+  TIFF/PNG/JPEG inputs. Persian text uses a bundled Vazirmatn font.
+- Convert every page to standard A4 fine-resolution fax with safe margins,
+  preserved proportions and automatic text pagination. Preview all pages before
+  sending; document conversion runs in the background and can be cancelled.
+- Include the native MuPDF renderer, font and dependency notices in portable
+  builds. Received faxes open in the internal multipage viewer.
+- Keep Linux development test executables in opt-in QA bundles to reduce the
+  user download size.
+- Verify PDF, TXT and typed-text fax transmission through loopback SIP peers,
+  alongside document geometry, mixed PDF sizes and Persian encoding tests.
+
+## 0.8.0 — 2026-11-15
+
+- Add a Fax tab with per-call T.38 (default) or G.711 pass-through selection,
+  TIFF/image document preparation, live progress and a received-fax table.
+- Add Fax to incoming call windows, local TIFF/history storage, export and
+  T.30-confirmed success/failure reporting. Fax calls use private software modems.
+- Extend the pinned Linphone SDK for native T.38 SDP/re-INVITE negotiation and
+  UDPTL media, with SpanDSP fax and libtiff dependencies in portable packages.
+- Preserve account security and voice-codec preferences; T.38 requires RTP media
+  and reports negotiation failure without silently changing protocol.
+
 ## 0.7.1 — 2026-11-13
 
 - Restyle the main navigation, Settings categories and account/license subtabs

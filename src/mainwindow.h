@@ -16,6 +16,7 @@ namespace stel {
 class SettingsWidget;
 class CallDialog;
 class ChatWidget;
+class FaxWidget;
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
@@ -42,6 +43,7 @@ private:
     QTabWidget *tabs_ = nullptr;
     SettingsWidget *settings_ = nullptr;
     ChatWidget *chat_ = nullptr;
+    FaxWidget *fax_ = nullptr;
     QDialog *settingsDialog_ = nullptr;
     QWidget *callAccountBar_ = nullptr;
     QHash<QString,CallInfo> callCache_;

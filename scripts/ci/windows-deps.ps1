@@ -58,6 +58,8 @@ $SdkSource = "$Destination/src/linphone-sdk"
 $KeychainSource = "$Destination/src/qtkeychain"
 Checkout-Pinned $Lock.linphone_sdk $SdkSource
 Checkout-Pinned $Lock.qtkeychain $KeychainSource
+Checked { & $Python "$Project/scripts/fax-sources.py" --work "$Destination/src/fax" spandsp libtiff }
+Checked { & $Python "$Project/scripts/build-pdf-engine.py" --work "$Destination/src/pdf" --download-only }
 if ($DownloadOnly) { Write-Host 'Pinned dependency sources and SDK gitlinks verified.'; return }
 Checked { & $Python "$Project/scripts/ci/patch-sdk.py" $SdkSource }
 $env:PATH += ';C:/Program Files/7-Zip'
@@ -81,6 +83,14 @@ Checked { cmake -S $KeychainSource -B "$Destination/build-keychain" -G Ninja `
     "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR" -DBUILD_WITH_QT6=OFF -DBUILD_SHARED_LIBS=ON `
     -DBUILD_TEST_APPLICATION=OFF }
 Checked { cmake --build "$Destination/build-keychain" --target install --parallel 4 }
+& "$Project/scripts/ci/windows-fax.ps1" -Destination $Destination
+Checked { & $Python "$Project/scripts/build-pdf-engine.py" --work "$Destination/src/pdf" --output "$Destination/pdf" }
+# Keep the original archive and source tree, without generated PDF objects/PDBs
+# in the dependency cache or the release's corresponding-source archive.
+$PdfProjects = "$Destination/src/pdf/src/$($Lock.fax.mupdf.directory)/platform/win32"
+foreach ($Generated in @("$PdfProjects/x64", "$PdfProjects/Release")) {
+    if (Test-Path $Generated) { Remove-Item $Generated -Recurse -Force }
+}
 New-Item -ItemType Directory -Force "$Destination/notices" | Out-Null
 Get-ChildItem "$Destination/src" -Recurse -File | Where-Object {
     $_.Name -match '^(COPYING|LICEN[CS]E|COPYRIGHT|NOTICE)(\.|$)'

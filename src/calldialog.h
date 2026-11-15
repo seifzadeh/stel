@@ -27,6 +27,7 @@ public:
     void reject() override;
 signals:
     void newCallRequested(const QString &accountId);
+    void faxRequested(const QString &callId);
 protected:
     void keyPressEvent(QKeyEvent *) override;
     void showEvent(QShowEvent *) override;
@@ -36,11 +37,13 @@ private:
     enum class PeerAction {Attended,Conference};
     SipEngine &engine_;
     CallInfo info_;
+    FaxInfo faxInfo_;
     QList<CallInfo> peers_;
     QString accountDetails_,transport_;
     QLabel *direction_,*name_,*address_,*account_,*status_,*duration_,*message_,*mediaDetails_,*routeHint_,*peerHint_;
     QLineEdit *digits_,*routeTarget_;
     QPushButton *answer_,*answerVideo_,*ringTransfer_,*hangup_,*hold_,*mute_,*record_,*transfer_,*forward_,*attended_,*conference_,*addCall_,*routeApply_,*peerApply_;
+    QPushButton *fax_;
     QList<QPushButton*> keypad_;
     QGroupBox *routePanel_,*peerPanel_;
     QComboBox *peerChoice_;

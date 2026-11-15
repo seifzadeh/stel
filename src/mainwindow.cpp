@@ -6,6 +6,7 @@
 #include "secretstore.h"
 #include "branding.h"
 #include "chatwidget.h"
+#include "faxwidget.h"
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
@@ -49,10 +50,11 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
     tabs_=new QTabWidget;tabs_->setObjectName("mainPages");layout->addWidget(tabs_,1);
     tabs_->addTab(createPhone(),navigationIcon(NavigationIcon::Phone),"Phone");chat_=new ChatWidget(engine_,store_);tabs_->addTab(chat_,navigationIcon(NavigationIcon::Messages),"Messages");tabs_->addTab(createContacts(),navigationIcon(NavigationIcon::Contacts),"Contacts");tabs_->addTab(createHistory(),navigationIcon(NavigationIcon::History),"Recent calls");
     styleNavigationTabs(tabs_,NavigationLevel::Primary);
+    fax_=new FaxWidget(engine_);tabs_->insertTab(2,fax_,navigationIcon(NavigationIcon::Fax),"Fax");
     connect(chat_,&ChatWidget::settingsRequested,this,&MainWindow::showSettings);
     const auto updateUnread=[this](int count){tabs_->setTabText(tabs_->indexOf(chat_),count?"Messages ("+QString::number(count)+")":"Messages");};
     connect(chat_,&ChatWidget::unreadCountChanged,this,updateUnread);updateUnread(chat_->unreadCount());
-    connect(tabs_,&QTabWidget::currentChanged,this,[this]{const bool phoneContext=tabs_->currentWidget()!=chat_;callAccountBar_->setVisible(phoneContext);status_->setVisible(phoneContext);});
+    connect(tabs_,&QTabWidget::currentChanged,this,[this]{const bool phoneContext=tabs_->currentWidget()!=chat_&&tabs_->currentWidget()!=fax_;callAccountBar_->setVisible(phoneContext);status_->setVisible(phoneContext);});
     log_=new QPlainTextEdit;log_->setReadOnly(true);log_->setMaximumBlockCount(150);log_->setMaximumHeight(105);log_->setPlaceholderText("Registration and call events");log_->hide();
     auto *showLog=new QCheckBox("Show events");layout->addWidget(showLog);layout->addWidget(log_);connect(showLog,&QCheckBox::toggled,log_,&QWidget::setVisible);
     connect(&engine_,&SipEngine::errorOccurred,this,[this](const QString &s){appendLog(s);statusBar()->showMessage(s,15000);});
@@ -174,6 +176,7 @@ QString MainWindow::selectedCall()const {auto *item=calls_->currentItem();return
 void MainWindow::save(){QString error;if(!settingsValid_){statusBar()->showMessage("Settings were not overwritten because the original file is invalid.");return;}if(!store_.save(accounts_,prefs_,&error))appendLog(error);}
 void MainWindow::rebuildAccounts(){
     chat_->setAccounts(accounts_);
+    fax_->setAccounts(accounts_);
     const auto selected=accountBox_->currentData().toString();accountBox_->blockSignals(true);accountBox_->clear();
     for(const auto &a:accounts_)accountBox_->addItem((a.label.isEmpty()?a.username+'@'+a.domain:a.label)+"  ·  "+registrationLabel(accountStates_.value(a.id,a.enabled?"Unregistered":"Disabled")),a.id);
     accountBox_->setCurrentIndex(qMax(0,accountBox_->findData(selected)));accountBox_->blockSignals(false);
@@ -209,6 +212,7 @@ void MainWindow::updateCall(const CallInfo &i){
     auto dialog=callDialogs_.value(i.id);
     if(!dialog&&first){
         dialog=new CallDialog(engine_,i,this);callDialogs_[i.id]=dialog;
+        connect(dialog,&CallDialog::faxRequested,this,[this](const QString &id){for(const auto &call:engine_.calls())if(call.id==id){if(fax_->receiveCall(call))tabs_->setCurrentWidget(fax_);break;}});
         connect(dialog,&QObject::destroyed,this,[this,id=i.id]{callDialogs_.remove(id);});
         connect(dialog,&CallDialog::newCallRequested,this,[this](const QString &accountId){
             accountBox_->setCurrentIndex(accountBox_->findData(accountId));tabs_->setCurrentIndex(0);showNormal();raise();activateWindow();target_->clear();target_->setFocus();

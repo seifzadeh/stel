@@ -12,6 +12,8 @@ import time
 project = Path(__file__).resolve().parents[1]
 single = Path(sys.argv[1]).resolve()
 folder = Path(sys.argv[2]).resolve()
+if not (folder / 'bin/stel_ui_tests').is_file():
+    raise SystemExit('Create the QA bundle with scripts/package-linux.py --include-tests before running this test.')
 expected_version = json.loads((folder / 'bundle-manifest.json').read_text())['version']
 logs = project / 'build/qa'
 results = {}

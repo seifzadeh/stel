@@ -1,0 +1,4 @@
+<RCC><qresource prefix="/faxfonts">
+  <file alias="Vazirmatn-Regular.ttf">../packaging/fonts/Vazirmatn-Regular.ttf</file>
+  <file alias="OFL.txt">../packaging/fonts/OFL.txt</file>
+</qresource></RCC>

@@ -1,0 +1,178 @@
+--- a/coreapi/linphonecore.c
++++ b/coreapi/linphonecore.c
+@@ -135,7 +135,8 @@
+ #ifdef LIBLINPHONE_GIT_VERSION
+     LIBLINPHONE_GIT_VERSION
+ #else
+-    LIBLINPHONE_VERSION
++    /* The pinned 5.3.105 release archive has no Git metadata. */
++    "5.3.105"
+ #endif
+     ;
+ 
+@@ -2543,6 +2544,10 @@
+ int linphone_core_get_upload_ptime(LinphoneCore *lc) {
+ 	return linphone_config_get_int(lc->config, "rtp", "upload_ptime", 0);
+ }
++
++extern "C" LINPHONE_PUBLIC void linphone_stel_fax_refresh_devices(LinphoneCore *core) { build_sound_devices_table(core); }
++
++extern "C" LINPHONE_PUBLIC int linphone_stel_fax_api_version(void) { return 1; }
+ 
+ const char *linphone_core_get_version(void) {
+ 	return liblinphone_version;
+--- a/src/sal/offeranswer.cpp
++++ b/src/sal/offeranswer.cpp
+@@ -413,10 +413,24 @@
+ 	return res;
+ }
+ 
++
++// Stel's opt-in external T.38 media endpoint. UDPTL has no RTP payload types.
++static bool stelT38(const SalStreamDescription &s) {
++    return s.type == SalOther && s.typeother == "image" && (s.getProtoAsString() == "udptl" || s.getProtoAsString() == "UDPTL");
++}
++static SalStreamDescription stelT38Result(const SalStreamDescription &local,
++                                         const SalStreamDescription &remote, bool incoming) {
++    SalStreamDescription result(incoming ? local : remote);
++    result.rtp_port = local.enabled() && remote.enabled() ? result.rtp_port : 0;
++    return result;
++}
++
+ SalStreamDescription OfferAnswerEngine::initiateOutgoingStream(const SalStreamDescription &local_offer,
+                                                                const SalStreamDescription &remote_answer,
+                                                                const bool allowCapabilityNegotiation) {
+ 
++    if (stelT38(local_offer) && stelT38(remote_answer))
++        return stelT38Result(local_offer, remote_answer, false);
+ 	SalStreamDescription result;
+ 	result.setLabel(local_offer.getLabel());
+ 	result.setContent(local_offer.getContent());
+@@ -738,6 +752,8 @@
+                                                                const SalStreamDescription &remote_offer,
+                                                                const std::string &bundle_owner_mid,
+                                                                const bool allowCapabilityNegotiation) {
++    if (stelT38(local_cap) && stelT38(remote_offer))
++        return stelT38Result(local_cap, remote_offer, true);
+ 	SalStreamDescription result;
+ 	result.name = local_cap.name;
+ 	result.type = local_cap.getType();
+--- a/src/sal/call-op.cpp
++++ b/src/sal/call-op.cpp
+@@ -98,6 +98,22 @@
+ 	return belle_sip_header_allow_create(oss.str().c_str());
+ }
+ 
++// Belle-SDP 5.3 represents media formats as RTP integers. Normalize only the
++// non-RTP T.38 format at the serialization boundary, preserving all SDP fields.
++static std::string stelT38Sdp(const std::string &input, bool wire) {
++    std::istringstream lines(input); std::string line, result;
++    while (std::getline(lines, line)) {
++        std::istringstream fields(line); std::string type, port, proto, format;
++        fields >> type >> port >> proto >> format;
++        if (type == "m=image" && (proto == "udptl" || proto == "UDPTL") &&
++            format == (wire ? "0" : "t38")) {
++            line = type + " " + port + " udptl " + (wire ? "t38" : "0") + "\r";
++        }
++        result += line + "\n";
++    }
++    return result;
++}
++
+ std::vector<char> SalCallOp::marshalMediaDescription(belle_sdp_session_description_t *sessionDesc,
+                                                      belle_sip_error_code &error) {
+ 	size_t length = 0;
+@@ -122,7 +138,8 @@
+ 	}
+ 
+ 	buffer.resize(length);
+-	return buffer;
++    const auto wire = stelT38Sdp(std::string(buffer.begin(), buffer.end()), true);
++    return std::vector<char>(wire.begin(), wire.end());
+ }
+ 
+ int SalCallOp::setSdp(belle_sip_message_t *msg, belle_sdp_session_description_t *sessionDesc) {
+@@ -309,7 +326,7 @@
+ 		return 0;
+ 	}
+ 
+-	string strBody = body.getBodyAsString();
++	string strBody = stelT38Sdp(body.getBodyAsString(), false);
+ 	if (strBody.empty()) return 0;
+ 	*sessionDesc = belle_sdp_session_description_parse(strBody.c_str());
+ 	if (!*sessionDesc) {
+--- a/src/conference/session/media-session.cpp
++++ b/src/conference/session/media-session.cpp
+@@ -2603,9 +2603,49 @@
+ 	setupRtcpFb(md);
+ 	setupRtcpXr(md);
+ 	if (stunClient) stunClient->updateMediaDescription(md);
++    // The application owns the UDPTL socket and T.30 endpoint. Keep rejected
++    // m-lines in place when changing an existing audio dialog (RFC 3264).
++    const auto *faxPortValue = getParams()->getCustomSdpAttribute("x-stel-fax-port");
++    const auto *faxProtocol = getParams()->getCustomSdpAttribute("x-stel-fax-protocol");
++    const auto remoteFaxMd = op ? op->getRemoteMediaDescription() : nullptr;
++    bool remoteT38 = false;
++    if (remoteFaxMd) for (const auto &s : remoteFaxMd->streams)
++        remoteT38 |= s.type == SalOther && s.typeother == "image" && (s.getProtoAsString() == "udptl" || s.getProtoAsString() == "UDPTL") && s.enabled();
++    const bool externalT38 = (faxProtocol && std::string(faxProtocol) == "t38") ||
++        (!localIsOfferer && remoteT38 && (!faxProtocol || std::string(faxProtocol) != "g711") && linphone_config_get_int(core->config, "sip", "stel_fax", 0));
++    if (externalT38) {
++        int faxPort = faxPortValue ? atoi(faxPortValue) : 9;
++        if (faxPort < 1 || faxPort > 65535) faxPort = 9;
++        const auto *faxAddress = getParams()->getCustomSdpAttribute("x-stel-fax-address");
++        const auto faxStreams = !localIsOfferer && remoteFaxMd ? remoteFaxMd : oldMd;
++        md->streams.clear(); md->bundles.clear(); md->ice_ufrag.clear(); md->ice_pwd.clear();
++        bool added = false;
++        if (faxStreams) for (const auto &s : faxStreams->streams) {
++            SalStreamDescription copy(s);
++            copy.rtp_port = 0; copy.rtcp_port = 0;
++            if (copy.type == SalOther && copy.typeother == "image" && (copy.getProtoAsString() == "udptl" || copy.getProtoAsString() == "UDPTL") && !added) {
++                copy.rtp_port = faxPort; added = true;
++            }
++            md->streams.push_back(copy);
++        }
++        if (!added) {
++            SalStreamDescription s; s.type = SalOther; s.typeother = "image"; s.rtp_port = faxPort;
++            md->streams.push_back(s);
++        }
++        for (auto &s : md->streams) if (s.type == SalOther && s.typeother == "image" && s.rtp_port) {
++            SalStreamConfiguration cfg; cfg.proto = SalProtoOther; cfg.proto_other = "udptl"; cfg.dir = SalStreamSendRecv;
++            s.addActualConfiguration(cfg); s.rtp_addr = faxAddress ? faxAddress : md->addr;
++            sal_custom_sdp_attribute_free(s.custom_sdp_attributes); s.custom_sdp_attributes = nullptr;
++            for (const auto &attribute : {std::make_pair("T38FaxVersion", "0"),
++                 std::make_pair("T38MaxBitRate", "14400"), std::make_pair("T38FaxRateManagement", "transferredTCF"),
++                 std::make_pair("T38FaxMaxDatagram", "400"), std::make_pair("T38FaxUdpEC", "t38UDPRedundancy")})
++                s.custom_sdp_attributes = sal_custom_sdp_attribute_append(s.custom_sdp_attributes, attribute.first, attribute.second);
++        }
++        getStreamsGroup().clearStreams();
++    }
+ 	localDesc = md;
+ 
+-	if (!getParams()->getPrivate()->isConferenceCreation()) {
++	if (!externalT38 && !getParams()->getPrivate()->isConferenceCreation()) {
+ 		OfferAnswerContext ctx;
+ 		ctx.localMediaDescription = localDesc;
+ 		ctx.remoteMediaDescription = localIsOfferer ? nullptr : (op ? op->getRemoteMediaDescription() : nullptr);
+@@ -4837,7 +4877,9 @@
+ 			}
+ 		}
+ 
+-		const auto isIceRunning = getStreamsGroup().getIceService().isRunning();
++		const auto *faxProtocol = msp->getCustomSdpAttribute("x-stel-fax-protocol");
++		const bool externalFaxUpdate = faxProtocol && std::string(faxProtocol) == "t38";
++		const auto isIceRunning = !externalFaxUpdate && getStreamsGroup().getIceService().isRunning();
+ 		// Add capability negotiation attributes if capability negotiation is enabled and it is not a reINVITE following
+ 		// conclusion of the capability negotiation procedure
+ 		bool addCapabilityNegotiationAttributesToLocalMd =
+@@ -5267,6 +5309,10 @@
+ 			}
+ 			if (md->name[0] != '\0') params->setSessionName(md->name);
+ 			params->getPrivate()->setCustomSdpAttributes(md->custom_sdp_attributes);
++            for (const auto &s : md->streams) if (s.type == SalOther && s.typeother == "image" && (s.getProtoAsString() == "udptl" || s.getProtoAsString() == "UDPTL") && s.enabled()) {
++                params->addCustomSdpAttribute("x-stel-remote-t38-port", std::to_string(s.rtp_port));
++                params->addCustomSdpAttribute("x-stel-remote-t38-address", s.rtp_addr.empty() ? md->addr : s.rtp_addr);
++            }
+ 			params->enableRtpBundle(!md->bundles.empty());
+ 			params->setRecordingState(md->record);
+ 

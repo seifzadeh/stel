@@ -79,5 +79,42 @@
     "url": "https://github.com/frankosterfeld/qtkeychain.git",
     "version": "0.15.0",
     "commit": "ad7344c45a86a4f66cbafc4b081b5f7b876cb0b7"
+  },
+  "fax": {
+    "linphone": {
+      "url": "https://codeload.github.com/BelledonneCommunications/liblinphone/tar.gz/refs/tags/5.3.105",
+      "sha256": "fc6f0a55f19d0252ca833e2ccfd71e6060c9f741069310a085059dd357272188",
+      "directory": "liblinphone-5.3.105"
+    },
+    "spandsp": {
+      "url": "https://deb.debian.org/debian/pool/main/s/spandsp/spandsp_0.0.6+dfsg.orig.tar.xz",
+      "sha256": "3dcdc611b8a119f1f26540d05e6279c4c1e5cd576271f6d45df431359fc190f9",
+      "directory": "spandsp-0.0.6+dfsg",
+      "patches": {
+        "url": "https://deb.debian.org/debian/pool/main/s/spandsp/spandsp_0.0.6+dfsg-2.2.debian.tar.xz",
+        "sha256": "01c3c8458c3480f43f17c7f18891d093a5eb27cccd5dd4e7d4d9d2217f30e089"
+      }
+    },
+    "libtiff": {
+      "url": "https://deb.debian.org/debian/pool/main/t/tiff/tiff_4.7.0.orig.tar.bz2",
+      "sha256": "2b8b5c4e79cb2a4651796602e45d6179b7f18bc283feab417b8e881ef7e81862",
+      "directory": "libtiff-v4.7.0",
+      "patches": {
+        "url": "https://deb.debian.org/debian/pool/main/t/tiff/tiff_4.7.0-3+deb13u3.debian.tar.xz",
+        "sha256": "c0cbcb717e20a69964bfa7471cbb0137dd39a451434932972bc7fbcdb86345f8"
+      }
+    },
+    "mupdf": {
+      "url": "https://github.com/ArtifexSoftware/mupdf-downloads/releases/download/1.28.6/mupdf-1.28.6-source.tar.gz",
+      "sha256": "dc85000640a45d90ca9b77b061f6ca67cce0c4d4fbecf8819647baf573eef101",
+      "directory": "mupdf-1.28.6-source"
+    },
+    "text_font": {
+      "name": "Vazirmatn",
+      "version": "33.003",
+      "url": "https://github.com/rastikerdar/vazirmatn/tree/v33.003",
+      "sha256": "b69fd4c680b8f3f225feabcc655a2c585d97627b8f5f5c0f9985e894069f3a56",
+      "license": "SIL-OFL-1.1"
+    }
   }
 }

@@ -8,6 +8,24 @@ the open-source licensing path of liblinphone. A proprietary product requires
 review of the SDK/Qt/dependency licences and, where applicable, commercial SDK
 licensing. Static linking does not remove licence or corresponding-source duties.
 
+Native fax uses SpanDSP 0.0.6 (LGPL-2.1/GPL source notices) and libtiff
+(permissive libtiff license). Stel's SDK T.38 extension retains liblinphone's
+AGPL-3.0-or-later terms. `packaging/dependencies.json` pins the source archives.
+The Linux package includes the exact patched SDK's original source and patch;
+the dependency source archive also includes the distribution's SpanDSP/libtiff
+sources. Windows sources include SpanDSP/libtiff and the MSVC build/UTF-8 adapter
+from `cmake/FaxSpandsp/`. See [FAX.md](docs/FAX.md) for the build profile.
+
+PDF fax preparation embeds MuPDF 1.28.6 and its upstream static dependencies
+(AGPL-3.0-or-later and their respective permissive licenses). The exact release
+archive and SHA-256 are pinned in `packaging/dependencies.json`; the renderer's
+notices are under `share/licenses/stel-pdf-engine`, and its original source is
+included in release dependency-source archives. The build uses upstream Make
+or MSVC projects; no PDF viewer or conversion service is required at runtime.
+Text fax preparation embeds Vazirmatn Regular 33.003 by Saber Rastikerdar and
+contributors, under SIL OFL 1.1. Its unmodified font and license are in
+`packaging/fonts` and distributed with the application source and notices.
+
 - liblinphone 5.3.105, belle-sip, mediastreamer2, oRTP, belr, bctoolbox and related
   SDK components: https://www.linphone.org/en/liblinphone-voip-sdk/
 - SDK source (pin a release and retain its exact source/submodule revisions):

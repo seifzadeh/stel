@@ -44,6 +44,9 @@ jobs:
     timeout-minutes: 60
     env:
       QT_QPA_PLATFORM: offscreen
+      STEL_FAX_SDK: ${{ github.workspace }}/.deps/fax-sdk
+      STEL_PDF_SDK: ${{ github.workspace }}/.deps/pdf-sdk
+      LD_LIBRARY_PATH: ${{ github.workspace }}/.deps/fax-sdk/lib
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -51,7 +54,9 @@ jobs:
       - run: bash scripts/ci/install-linux-deps.sh
       - name: Build and test the native application
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSTEL_QT_MAJOR=5 -DSTEL_DISTRO_LINPHONE=ON -DSTEL_AV1_ADDON=ON -DSTEL_LEGACY_VIDEO_ADDON=ON
+          python3 scripts/build-fax-sdk.py --output "$STEL_FAX_SDK"
+          python3 scripts/build-pdf-engine.py --output "$STEL_PDF_SDK"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSTEL_QT_MAJOR=5 -DSTEL_DISTRO_LINPHONE=ON -DSTEL_LINPHONE_ROOT="$STEL_FAX_SDK" -DSTEL_PDF_ROOT="$STEL_PDF_SDK" -DSTEL_AV1_ADDON=ON -DSTEL_LEGACY_VIDEO_ADDON=ON
           cmake --build build --parallel 4
           bash scripts/ci/test-linux.sh build
       - name: Package and test the standalone binary
@@ -117,7 +122,7 @@ jobs:
         id: dependencies
         with:
           path: C:/stel-deps
-          key: windows-v142-${{ hashFiles('packaging/dependencies.json', 'scripts/ci/windows-deps.ps1', 'scripts/ci/fetch-source-archives.py', 'scripts/ci/patch-sdk.py', 'packaging/patches/**') }}
+          key: windows-v142-${{ hashFiles('packaging/dependencies.json', 'scripts/ci/windows-deps.ps1', 'scripts/ci/windows-fax.ps1', 'scripts/fax-sources.py', 'scripts/build-pdf-engine.py', 'cmake/StelPdfEngine.cmake', 'cmake/FaxSpandsp/**', 'scripts/ci/fetch-source-archives.py', 'scripts/ci/patch-sdk.py', 'packaging/patches/**') }}
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: steps.dependencies.outputs.cache-hit != 'true'
         id: sources

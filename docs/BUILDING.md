@@ -12,8 +12,14 @@ and enables `deb-src`; it is intended for build hosts.
 
 ```sh
 sudo bash scripts/ci/install-linux-deps.sh
+export STEL_FAX_SDK="$PWD/.deps/fax-sdk"
+python3 scripts/build-fax-sdk.py --output "$STEL_FAX_SDK"
+export STEL_PDF_SDK="$PWD/.deps/pdf-sdk"
+python3 scripts/build-pdf-engine.py --output "$STEL_PDF_SDK"
+export LD_LIBRARY_PATH="$STEL_FAX_SDK/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DSTEL_QT_MAJOR=5 -DSTEL_DISTRO_LINPHONE=ON \
+  -DSTEL_LINPHONE_ROOT="$STEL_FAX_SDK" -DSTEL_PDF_ROOT="$STEL_PDF_SDK" \
   -DSTEL_AV1_ADDON=ON -DSTEL_LEGACY_VIDEO_ADDON=ON
 cmake --build build --parallel 4
 bash scripts/ci/test-linux.sh build
@@ -27,6 +33,10 @@ listed OS facilities remain external. Debian 13 packages determine the Linux
 dependency versions; their exact binary/source versions are recorded in
 `share/licenses/debian-sources.json`. CI downloads the matching `.dsc`, original
 tarballs and Debian patches into the release's dependency-source archive.
+`STEL_PDF_SDK` identifies the checksum-pinned MuPDF build for packaging. Its
+static libraries are linked into Stel, notices are bundled, and the original
+source archive accompanies release dependency sources. The text font is embedded
+from `packaging/fonts`; users need no separate PDF tool or font installation.
 
 The test wrapper starts a private D-Bus session and an unlocked GNOME Secret
 Service in temporary XDG directories. A real `secret-tool` store/read/delete
@@ -47,6 +57,10 @@ The automated recipe is in `.github/workflows/build-release.yml` and
 - Linphone SDK 5.3.105 and recursively pinned submodules, compiled with video,
   AV1, VP8, embedded OpenH264, G.729, SRTP and ZRTP.
 - QtKeychain 0.15.0, compiled with the same Qt and compiler ABI.
+- The native fax SDK extension, checksum-pinned SpanDSP/libtiff sources and
+  matching Debian fixes; the MSVC fax DLL is included in the portable package.
+- MuPDF 1.28.6 using its upstream MSVC solution and v142 runtime, linked
+  statically for PDF-to-fax preparation; `STEL_PDF_ROOT` points to its prefix.
 
 Exact SDK/keychain commits are in `packaging/dependencies.json`. The Actions
 recipe installs MSYS2 UCRT64 build tools, selects the x64 MSVC environment, then runs:
@@ -99,6 +113,11 @@ path works around incomplete distro CMake exports. Leave the app's MS2 addon
 options off with an SDK that already supplies those filters. The legacy FFmpeg 7
 addon is for the tested Debian integration, not the Windows SDK.
 
+The SDK needs the native fax extension. `scripts/build-sdk.sh` applies it for
+static SDK builds. Build the `cmake/FaxSpandsp` wrapper with `BUILD_SHARED_LIBS=OFF`
+and use static libtiff as well when configuring `STEL_STATIC=ON`. See [FAX.md](FAX.md)
+for protocol, document, dependency-source and packaging details.
+
 `STEL_STATIC=ON` requires static Qt, QtKeychain and all SDK/dependency targets;
 the configure step rejects shared targets. CI currently produces bundled runtime
 packages rather than claiming fully static output. See `scripts/build-static.sh`
@@ -111,3 +130,8 @@ software video, per-account auto answer/caller names, settings dialogs, and
 mutual TLS/digest with generated certificates. Tests use local loopback peers.
 For visual evidence, set `STEL_QA_SCREENSHOTS` when running `stel_ui_tests`.
 See `docs/TEST_REPORT.md` for locally verified results and their limits.
+
+User packages omit development test executables. For a dedicated portable QA
+bundle, pass `--include-tests` to `scripts/package-linux.py` before running
+`tests/test_portable.py` with the single-file binary and bundle folder paths.
+This avoids shipping multiple copies of the embedded renderer in user downloads.

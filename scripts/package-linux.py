@@ -34,6 +34,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--build', type=Path, default=PROJECT / 'build')
     parser.add_argument('--output', type=Path, default=PROJECT / 'dist/Stel-linux-x86_64')
+    parser.add_argument('--include-tests', action='store_true', help='Include development test executables for portable QA')
     args = parser.parse_args()
     source_origins = set()
     def runtime_file(source, destination):
@@ -55,12 +56,10 @@ def main():
         (output / part).mkdir(parents=True, exist_ok=True)
     executable = args.build.resolve() / 'stel'
     shutil.copy2(executable, output / 'stel')
-    if (args.build / 'stel_probe').exists():
-        shutil.copy2(args.build / 'stel_probe', output / 'bin/stel_probe')
-    if (args.build / 'stel_tests').exists():
-        shutil.copy2(args.build / 'stel_tests', output / 'bin/stel_tests')
-    if (args.build / 'stel_ui_tests').exists():
-        shutil.copy2(args.build / 'stel_ui_tests', output / 'bin/stel_ui_tests')
+    if args.include_tests:
+        for name in ('stel_probe', 'stel_tests', 'stel_ui_tests', 'stel_fax_tests', 'stel_fax_document_tests'):
+            if (args.build / name).exists():
+                shutil.copy2(args.build / name, output / 'bin' / name)
     if shutil.which('strip'):
         subprocess.run(['strip', '--strip-unneeded', str(output / 'stel')], check=True)
         for binary in (output / 'bin').iterdir():
@@ -103,6 +102,19 @@ def main():
             continue
         shutil.copy2(PROJECT / file, output / 'share/doc/stel' / file)
     shutil.copytree(PROJECT / 'LICENSES', output / 'share/doc/stel/LICENSES')
+    fax_sdk = os.environ.get('STEL_FAX_SDK')
+    if not fax_sdk:
+        raise SystemExit('Set STEL_FAX_SDK to the patched SDK prefix so matching source and notices are bundled.')
+    fax_notices = Path(fax_sdk) / 'share/licenses/stel-fax-sdk'
+    if not (fax_notices / 'liblinphone-5.3.105-source.tar.gz').is_file():
+        raise SystemExit('The native fax SDK corresponding-source archive is missing; rebuild with scripts/build-fax-sdk.py.')
+    shutil.copytree(fax_notices, output / 'share/licenses/stel-fax-sdk')
+    pdf_sdk = os.environ.get('STEL_PDF_SDK')
+    pdf_notices = Path(pdf_sdk or '') / 'share/licenses/stel-pdf-engine'
+    if not pdf_sdk or not (pdf_notices / 'source.json').is_file():
+        raise SystemExit('Set STEL_PDF_SDK to the renderer prefix built by scripts/build-pdf-engine.py.')
+    shutil.copytree(pdf_notices, output / 'share/licenses/stel-pdf-engine')
+    shutil.copytree(PROJECT / 'packaging/fonts', output / 'share/licenses/fax-font')
     if (PROJECT / 'docs').exists():
         shutil.copytree(PROJECT / 'docs', output / 'share/doc/stel/docs')
     for component in ('ms2-av1', 'ms2-legacy'):
@@ -203,6 +215,7 @@ def main():
     minimum = max(symbols, key=lambda x: tuple(map(int, x.split('.'))))
     version = re.search(r'project\(Stel VERSION ([0-9.]+)', (PROJECT / 'CMakeLists.txt').read_text())[1]
     manifest = {'version': version, 'architecture': 'x86_64', 'fully_static': False,
+                'includes_development_tests': args.include_tests,
                 'minimum_glibc': minimum, 'external_os_libraries': sorted(external),
                 'bundled_elf_count': len(elf_files), 'development_prefix': 'removed',
                 'files': {str(p.relative_to(output)): hashlib.sha256(p.read_bytes()).hexdigest()

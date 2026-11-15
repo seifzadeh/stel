@@ -209,7 +209,7 @@ QWidget *SettingsWidget::aboutPage() {
     auto *details=new QTextBrowser;details->setObjectName("aboutDetails");details->setOpenExternalLinks(true);details->setFrameShape(QFrame::NoFrame);
     details->setHtml(QString::fromUtf8(R"HTML(
 <p>A compact, open-source, multi-account SIP softphone for desktop computers.<br>
-Voice and video calls, TLS, SRTP, call transfer, conferencing and developer-friendly test devices.</p>
+Voice and video calls, messaging, T.38/G.711 fax, TLS, SRTP, call transfer, conferencing and developer-friendly test devices.</p>
 <h3>Principal developer</h3>
 <p><b>Mehrdad Seifzadeh</b><br>
 <a href="mailto:mehrdad.seifzadeh@gmail.com">mehrdad.seifzadeh@gmail.com</a><br>
@@ -229,6 +229,10 @@ Matching source code, build instructions and third-party notices accompany relea
 liblinphone, belle-sip, Mediastreamer2, oRTP, bctoolbox, belr and related components — upstream GPL/AGPL licenses.</li>
 <li><a href="https://www.qt.io/">Qt</a> %2 — desktop interface and networking; LGPL/GPL, depending on module.</li>
 <li><a href="https://github.com/frankosterfeld/qtkeychain">QtKeychain</a> — secure credential storage; BSD-3-Clause.</li>
+<li><a href="https://www.soft-switch.org/">SpanDSP</a> — native T.30 fax modems and T.38 terminal; LGPL/GPL notices accompany the package.</li>
+<li><a href="https://libtiff.gitlab.io/libtiff/">libtiff</a> — fax document encoding and decoding; libtiff permissive license.</li>
+<li><a href="https://mupdf.com/">MuPDF 1.28.6</a> — embedded PDF rendering for A4 fax preparation; AGPL-3.0-or-later, with upstream dependency notices.</li>
+<li><a href="https://github.com/rastikerdar/vazirmatn">Vazirmatn 33.003</a> — Persian/Latin fax text font; SIL Open Font License 1.1.</li>
 <li>Codec and media backends (depending on the build): bcg729, Opus, Speex, libvpx,
 OpenH264, libaom, dav1d, FFmpeg and libyuv. See the release's third-party notices for exact versions and licenses.</li>
 <li>Crypto and compression backends (depending on the build): Mbed TLS, OpenSSL, libsrtp, bzrtp and zlib.</li>

@@ -4,6 +4,8 @@ set -euo pipefail
 STEL_SDK_SOURCE="${1:?Usage: build-sdk.sh /path/to/linphone-sdk [install-prefix]}"
 STEL_SDK_PREFIX="${2:-$PWD/vendor/linphone-static}"
 STEL_SDK_SOURCE="$(cd "$STEL_SDK_SOURCE" && pwd)"
+STEL_SOURCE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+python3 "$STEL_SOURCE_DIR/scripts/build-fax-sdk.py" --patch-only "$STEL_SDK_SOURCE/liblinphone"
 cmake -S "$STEL_SDK_SOURCE" -B "$STEL_SDK_SOURCE/build-stel-static" \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$STEL_SDK_PREFIX" \
   -DLINPHONESDK_PLATFORM=Desktop -DBUILD_SHARED_LIBS=OFF \

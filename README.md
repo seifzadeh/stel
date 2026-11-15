@@ -5,6 +5,13 @@
 
 ![Stel desktop](website/assets/main-window.png)
 
+Fax is available from the main **Fax** tab and the incoming call window. Choose
+T.38 (default) or G.711 pass-through for each call, type a message or select a
+PDF/TXT/TIFF/PNG/JPEG document. Stel prepares standard A4 pages automatically,
+with Persian text support and an internal multipage preview. Browse/export
+received faxes below the send form. See [the fax guide](docs/FAX.md) for protocol,
+document and build requirements.
+
 Stel provides voice and video calling, multiple SIP accounts, a separate dialog
 for each call, DTMF, hold, blind/attended transfer, forwarding and conferencing.
 Settings include live account registration status, per-account Auto Answer and

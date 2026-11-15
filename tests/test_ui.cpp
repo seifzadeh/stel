@@ -9,6 +9,7 @@
 #include <QTextOption>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QTableWidget>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QMessageBox>
@@ -135,6 +136,7 @@ private slots:
             QVERIFY(incoming);QCOMPARE(incoming->data(Qt::UserRole+1).toString(),QString("bob"));calls->setCurrentItem(incoming);
             auto *in=dialog(window,true),*out=dialog(window,false);QVERIFY(in&&out&&in!=out);QVERIFY(in->isVisible()&&out->isVisible());
             QCOMPARE(in->callInfo().accountId,QString("bob"));QVERIFY(in->findChild<QLabel*>("callerAddress")->text().contains("alice"));
+            QVERIFY(UiTests::button(*in,"callFax")->isVisible());QVERIFY(UiTests::button(*in,"callFax")->isEnabled());
             captureCall(*in,video?"call-incoming-video-offer":"call-incoming");QVERIFY(UiTests::button(*in,video?"callAnswerVideo":"callAnswer")->isEnabled());QTest::mouseClick(UiTests::button(*in,video?"callAnswerVideo":"callAnswer"),Qt::LeftButton);
             auto running=[&]{int count=0;for(int n=0;n<calls->count();++n)count+=calls->item(n)->data(Qt::UserRole+3).toInt()==LinphoneCallStreamsRunning;return count==2;};
             QTRY_VERIFY_WITH_TIMEOUT(running(),10000);
@@ -330,8 +332,10 @@ private slots:
         window->showSettings();auto *dialog=window->findChild<QDialog*>("settingsDialog");QVERIFY(dialog&&dialog->isVisible());
         QVERIFY(window->findChild<QCheckBox*>("rememberPassword")->isChecked());
         screenshot(*window,"accounts-two-registered");
-        auto *mainPages=window->findChild<QTabWidget*>("mainPages");QCOMPARE(mainPages->count(),4);
+        auto *mainPages=window->findChild<QTabWidget*>("mainPages");QCOMPARE(mainPages->count(),5);QCOMPARE(mainPages->tabText(2),QString("Fax"));
         dialog->close();QVERIFY(window->isVisible());QVERIFY(!dialog->isVisible());QVERIFY(registered());QVERIFY(unregistered.isEmpty());
+        mainPages->setCurrentIndex(2);QCOMPARE(window->findChild<QComboBox*>("faxProtocol")->currentData().toString(),QString("t38"));
+        QVERIFY(window->findChild<QTableWidget*>("receivedFaxes"));screenshot(*window,"fax-main-window");mainPages->setCurrentIndex(0);
         auto close=[&](QMessageBox::StandardButton answer){QTimer::singleShot(0,window.get(),[&]{auto *question=window->findChild<QMessageBox*>("confirmExit");QVERIFY(question);screenshot(*question,"confirm-exit");question->button(answer)->click();});window->close();};
         close(QMessageBox::Cancel);QVERIFY(window->isVisible());QVERIFY(registered());
         close(QMessageBox::Yes);QVERIFY(!window->isVisible());window.reset();

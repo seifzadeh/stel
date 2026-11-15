@@ -20,6 +20,8 @@ public:
     bool registered(const QString &user) const {return bindings_.contains(user);}
     int invites=0,answers=0,rejectedMessages=0;
     QList<QByteArray> messageBodies,messageFrom,messageTo,messageContentTypes;
+    QList<QByteArray> inviteBodies;
+    QList<QByteArray> sdpAnswers;
     bool bareRequestUri=true;
 private:
     struct Dialog {QString a,b,aId,bId;};
@@ -48,6 +50,7 @@ private:
             const int split=data.indexOf("\r\n\r\n");if(split<0)continue;
             QList<QByteArray> lines;for(auto line:data.left(split).split('\n'))lines<<line.trimmed();if(lines.isEmpty())continue;
             const auto body=data.mid(split+4);
+            if(lines[0].startsWith("INVITE "))inviteBodies<<body;
             if(lines[0].startsWith("REGISTER ")) {
                 const auto name=user(header(lines,"from"));const auto contact=header(lines,"contact");
                 const bool off=header(lines,"expires")=="0"||contact.contains("expires=0");
@@ -57,6 +60,7 @@ private:
             }
             const auto id=QString::fromUtf8(header(lines,"call-id"));
             if(lines[0].startsWith("SIP/2.0 ")) {
+                if(lines[0].startsWith("SIP/2.0 200")&&header(lines,"cseq").endsWith("INVITE"))sdpAnswers<<body;
                 const auto branch=QRegularExpression("branch=([^; ]+)").match(QString::fromUtf8(header(lines,"via"))).captured(1);
                 if(!transactions_.contains(branch))continue;
                 const auto transaction=transactions_[branch];

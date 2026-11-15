@@ -1,6 +1,7 @@
 #pragma once
 #include "model.h"
 #include "dummydevices.h"
+#include "faxmedia.h"
 #include <QObject>
 #include <QHash>
 #include <QSet>
@@ -42,6 +43,10 @@ public:
     bool dial(const QString &accountId, const QString &target, bool video = false);
     QString messageTarget(const QString &accountId,const QString &target) const;
     QString sendMessage(const QString &accountId,const QString &target,const QString &text);
+    bool sendFax(const QString &accountId,const QString &target,const QString &document,const QString &protocol="t38");
+    bool receiveFax(const QString &callId,const QString &protocol="t38");
+    static bool t38Available();
+    QList<FaxInfo> faxes() const;
     bool answer(const QString &, bool video);
     bool hangup(const QString &);
     bool hold(const QString &, bool held);
@@ -75,6 +80,7 @@ signals:
     void errorOccurred(const QString &message);
     void notification(const QString &message);
     void messageChanged(const stel::MessageInfo &message);
+    void faxChanged(const stel::FaxInfo &fax);
 private:
     struct AccountHandle { Account config; LinphoneAccount *account = nullptr; LinphoneAuthInfo *auth = nullptr; LinphoneAuthInfo *turnAuth = nullptr; };
     LinphoneCore *core_ = nullptr;
@@ -86,6 +92,19 @@ private:
     QHash<QString,SipEngine*> certificateCores_;
     struct PendingMessage { MessageInfo info; LinphoneChatMessageCbs *callbacks=nullptr; };
     QHash<LinphoneChatMessage*,PendingMessage> messages_;
+    struct FaxHandle { FaxInfo info; std::shared_ptr<FaxMedia> media; QString card; bool connected=false,requestedT38=false; };
+    QHash<QString,FaxHandle> faxes_;
+    QString pendingFax_;
+    bool faxHistoryValid_=true;
+    bool faxResourcesShared_=false;
+    LinphoneMediaResourceMode faxPreviousResources_=LinphoneExclusiveMediaResources;
+    void shareFaxResources();
+    void releaseFaxMedia(FaxHandle &);
+    bool prepareFax(FaxHandle &,bool incoming,const QString &protocol,const QString &document);
+    void configureFax(LinphoneCallParams *,const FaxHandle &,bool t38);
+    void faxCallState(LinphoneCall *,LinphoneCallState);
+    void persistFaxes();
+    void loadFaxes();
     bool certificateLeaf_ = false, testMode_ = false;
     bool muted_ = false;
     quintptr remoteWindow_ = 0, previewWindow_ = 0;

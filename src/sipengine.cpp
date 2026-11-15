@@ -48,12 +48,15 @@ static LinphoneMediaEncryption encryption(const QString &s) {
 SipEngine::SipEngine(QObject *parent) : QObject(parent) {
     qRegisterMetaType<stel::CallInfo>();
     qRegisterMetaType<stel::MessageInfo>();
+    qRegisterMetaType<stel::FaxInfo>();
     iterate_.setInterval(20);
     connect(&iterate_,&QTimer::timeout,this,[this]{ if(core_)linphone_core_iterate(core_); });
 }
 SipEngine::~SipEngine() { shutdown(); }
 void SipEngine::shutdown() {
     stopping_=true; iterate_.stop();
+    for(auto &h:faxes_)if(h.media){h.media->stop();if(h.info.state=="dialing"||h.info.state=="sending"||h.info.state=="receiving"||h.info.state=="negotiating"){h.info.state="interrupted";h.info.detail="The application closed before the fax completed.";}}
+    if(!dataDirectory_.isEmpty())persistFaxes();
     // Children must stop while the composite engine and its signal state live.
     const auto children=certificateCores_;certificateCores_.clear();for(auto *child:children)delete child;
     if(core_) {
@@ -100,10 +103,12 @@ bool SipEngine::start(const Preferences &prefs,const QString &directory,bool tes
     preferences_=prefs;testMode_=testMode;
     dataDirectory_=directory; QDir().mkpath(directory+"/certificates"); QDir().mkpath(directory+"/recordings");
     QDir().mkpath(directory+"/cache");
+    QDir().mkpath(directory+"/faxes");QFile::setPermissions(directory+"/faxes",QFile::ReadOwner|QFile::WriteOwner|QFile::ExeOwner);loadFaxes();
     if(!prefs.caFile.isEmpty() && !QFile::exists(prefs.caFile))return fail("CA file does not exist.");
     auto *config=linphone_config_new(nullptr); // Memory only: never persist SIP or TURN secrets in linphonerc.
     linphone_config_set_int(config,"sip","store_auth_info",0);
     linphone_config_set_int(config,"sip","accounts_channel_isolation",1);
+    linphone_config_set_int(config,"sip","stel_fax",t38Available());
     // SDK 5.3's offer/answer retry can replace SRTP with RTP despite the
     // per-call mandatory flag. Keep the media type explicitly chosen by the
     // user, without changing the core-wide incoming negotiation policy.
@@ -241,6 +246,7 @@ bool SipEngine::addAccount(const Account &a) {
         connect(child,&SipEngine::callChanged,this,&SipEngine::callChanged);
         connect(child,&SipEngine::callFinished,this,&SipEngine::callFinished);
         connect(child,&SipEngine::messageChanged,this,&SipEngine::messageChanged);
+        connect(child,&SipEngine::faxChanged,this,&SipEngine::faxChanged);
         connect(child,&SipEngine::notification,this,&SipEngine::notification);
         connect(child,&SipEngine::errorOccurred,this,[this](const QString &s){fail(s);});
         if(!child->start(childPrefs,dataDirectory_+"/accounts/"+a.id,testMode_) || !child->addAccount(a)) {
@@ -406,6 +412,7 @@ bool SipEngine::answer(const QString &id,bool video) {
     auto *c=call(id); if(!c)return fail("Call no longer exists.");
     const auto policy=accounts_.value(accountId(c)).config.encryption;
     const auto *offered=linphone_call_get_remote_params(c);
+    if(offered&&linphone_call_params_get_custom_sdp_attribute(offered,"x-stel-remote-t38-port"))return fail("This is a T.38 fax call. Use the Fax button to receive it.");
     // SDES can be checked before answering; DTLS is established by its later
     // handshake and is enforced by the SDK's DTLS policy instead.
     if(offered&&policy=="srtp"&&linphone_call_params_get_media_encryption(offered)!=LinphoneMediaEncryptionSRTP) {
@@ -657,7 +664,8 @@ QStringList SipEngine::soundDevices(bool captureOnly,bool playbackOnly) const {
         auto *device=static_cast<LinphoneAudioDevice*>(node->data);
         const bool suitable=(!captureOnly||linphone_audio_device_has_capability(device,LinphoneAudioDeviceCapabilityRecord))&&
             (!playbackOnly||linphone_audio_device_has_capability(device,LinphoneAudioDeviceCapabilityPlay));
-        if(suitable)result<<str(linphone_audio_device_get_id(device));
+        const auto id=str(linphone_audio_device_get_id(device));
+        if(suitable&&!id.startsWith("StelFax:"))result<<id;
         linphone_audio_device_unref(device);
     }
     bctbx_list_free(devices);return result;
@@ -800,6 +808,7 @@ void SipEngine::callCb(LinphoneCore *lc,LinphoneCall *c,LinphoneCallState state,
         self->callIds_.insert(c,id); self->calls_.insert(id,linphone_call_ref(c));
     }
     auto i=self->info(c); i.message=str(message);
+    self->faxCallState(c,state);
     if(!self->stopping_)emit self->callChanged(i);
     // Post decisions outside the callback to avoid nested call-state notifications.
     if(state==LinphoneCallIncomingReceived && !self->stopping_)QTimer::singleShot(0,self,[self,id=i.id]{

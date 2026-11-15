@@ -2,6 +2,7 @@
 """Download exact Debian source packages for the audited binary bundle."""
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import tarfile
@@ -26,4 +27,10 @@ for package in metadata:
     'Build metadata is in each package\'s debian/ directory; Stel build scripts are in its source archive.\n')
 with tarfile.open(args.output / 'Stel-dependencies-linux-sources.tar.gz', 'w:gz') as tar:
     tar.add(sources, arcname=sources.name)
+    tar.add(args.bundle / 'share/licenses/stel-fax-sdk', arcname='stel-fax-sdk')
+    pdf_source = Path(os.environ.get('STEL_PDF_SDK', '.deps/pdf-sdk')) / 'share/sources/mupdf-source.tar.gz'
+    if not pdf_source.is_file():
+        raise SystemExit('Native PDF renderer source is missing; set STEL_PDF_SDK to its build prefix.')
+    tar.add(pdf_source, arcname='stel-pdf-engine/mupdf-source.tar.gz')
+    tar.add(args.bundle / 'share/licenses/stel-pdf-engine', arcname='stel-pdf-engine/notices')
 print(f'Downloaded {len(metadata)} matching source packages')

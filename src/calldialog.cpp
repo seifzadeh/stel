@@ -70,6 +70,7 @@ CallDialog::CallDialog(SipEngine &engine,const CallInfo &info,QWidget *parent):Q
     auto button=[&](const QString &text,const QString &object){auto *b=new QPushButton(text);b->setObjectName(object);b->setAutoDefault(false);b->setMinimumHeight(34);return b;};
     answer_=button("Answer","callAnswer");answerVideo_=button("Answer with video","callAnswerVideo");hangup_=button("Hang up","callHangup");ringTransfer_=button("Transfer","callIncomingTransfer");
     for(auto *b:{answer_,answerVideo_,hangup_,ringTransfer_})primary->addWidget(b);
+    fax_=button("Fax","callFax");primary->addWidget(fax_);connect(fax_,&QPushButton::clicked,this,[this]{emit faxRequested(info_.id);});
     layout->addLayout(primary);
     mediaTabs_=new QTabWidget;mediaTabs_->setObjectName("callMediaTabs");layout->addWidget(mediaTabs_);
     auto *keypad=new QWidget;auto *keyLayout=new QVBoxLayout(keypad);keyLayout->setContentsMargins(10,10,10,10);digits_=new QLineEdit;digits_->setObjectName("callDtmfDisplay");digits_->setReadOnly(true);digits_->setPlaceholderText("DTMF sent on this call");digits_->setMaxLength(40);keyLayout->addWidget(digits_);
@@ -103,6 +104,8 @@ CallDialog::CallDialog(SipEngine &engine,const CallInfo &info,QWidget *parent):Q
     connect(peerApply_,&QPushButton::clicked,this,&CallDialog::applyPeer);connect(cancelPeer,&QPushButton::clicked,peerPanel_,&QWidget::hide);connect(addCall_,&QPushButton::clicked,this,&CallDialog::requestNewCall);
     connect(mediaTabs_,&QTabWidget::currentChanged,this,[this](int tab){if(tab==1)bindVideo();});
     setStyleSheet("QWidget#callBody{background:#f2f5f7;} QFrame#callIdentity{background:white;border:1px solid #d7e0e7;border-radius:8px;} QPushButton#callAnswer,QPushButton#callAnswerVideo{background:#138e81;color:white;border:0;} QPushButton#callHangup{background:#bd4052;color:white;border:0;} QPushButton:checked{background:#ddf2ee;border-color:#138e81;color:#134d48;} QLabel#callDirection{color:#607688;font-size:11px;font-weight:600;}");
+    for(const auto &fax:engine_.faxes())if(fax.callId==info.id)faxInfo_=fax;
+    connect(&engine_,&SipEngine::faxChanged,this,[this](const FaxInfo &fax){if(fax.callId==info_.id){faxInfo_=fax;updateCall(info_,accountDetails_,transport_);}});
     updateCall(info,info.accountName,{});
     if(info.incoming&&info.rawState==LinphoneCallIncomingReceived)mediaTabs_->setCurrentIndex(2);
 }
@@ -144,6 +147,7 @@ void CallDialog::updateCall(const CallInfo &info,const QString &accountDetails,c
     status_->setText(!ended&&info.inConference?"Conference · "+QString::number(info.conferenceParticipants)+" participants":callStateLabel(state));status_->setStyleSheet("font-weight:600;color:"+QString(state==LinphoneCallError?"#b33748":connected?"#087f74":incoming?"#a16a16":"#526b7c")+";");
     answer_->setVisible(incoming);answerVideo_->setVisible(incoming&&info.video);hangup_->setText(incoming?"Reject":established?"Hang up":ended?"Call ended":"Cancel call");hangup_->setEnabled(!ended);
     ringTransfer_->setVisible(incoming);if(justAnswered)mediaTabs_->setCurrentIndex(0);
+    fax_->setVisible(info.incoming&&!ended);fax_->setEnabled(incoming||connected||state==LinphoneCallUpdatedByRemote);
     hold_->setEnabled(established&&!info.inConference);hold_->setText(state==LinphoneCallPaused?"Resume":"Hold");
     mute_->setEnabled(established&&(!info.inConference||connected));record_->setEnabled(connected);{const QSignalBlocker block(mute_);mute_->setChecked(info.muted);}{const QSignalBlocker block(record_);record_->setChecked(info.recording);}record_->setText(info.recording?"Stop recording":"Record");
     transfer_->setEnabled(incoming||established);forward_->setEnabled(incoming);attended_->setEnabled(established&&!info.inConference);conference_->setEnabled(established);addCall_->setEnabled(established&&!info.inConference);
@@ -153,6 +157,14 @@ void CallDialog::updateCall(const CallInfo &info,const QString &accountDetails,c
     mediaDetails_->setText("Remote address: "+info.remote+"\nLocal account: "+accountDetails+"\nSignalling: "+(transport.isEmpty()?QString("—"):transport.toUpper())+"\nMedia security: "+mediaEncryption(info.encryption)+"\nAudio codec: "+(info.audioCodec.isEmpty()?QString("Negotiating"):info.audioCodec)+"\nVideo codec: "+(info.videoCodec.isEmpty()?QString("—"):info.videoCodec));
     if(routePanel_->isVisible()){const bool canRoute=routeAction_==RouteAction::Forward?incoming:(incoming||established);routeApply_->setEnabled(canRoute);routeHint_->setText(incoming?"Send this ringing call to another destination without answering.":"Transfer this connected call to another destination.");}
     refreshPeers(peers_);
+    if(!faxInfo_.id.isEmpty()&&!ended&&!(incoming&&faxInfo_.state=="failed")){
+        const auto protocol=faxInfo_.protocol=="t38"?QString("T.38"):QString("G.711 pass-through");
+        status_->setText("Fax · "+protocol+" · "+faxInfo_.state+" · "+QString::number(faxInfo_.pages)+" pages");
+        mediaDetails_->setText(mediaDetails_->text()+"\nFax protocol: "+protocol+"\nFax status: "+faxInfo_.state+"\nPages confirmed: "+QString::number(faxInfo_.pages));
+        for(auto *b:{answer_,answerVideo_,fax_,ringTransfer_,hold_,mute_,record_,transfer_,forward_,attended_,conference_,addCall_})b->setEnabled(false);
+        for(auto *b:keypad_)b->setEnabled(false);
+        if(!faxInfo_.detail.isEmpty())showError(faxInfo_.detail);
+    }
     if(consultationPending_&&state==LinphoneCallPaused){consultationPending_=false;QTimer::singleShot(0,this,[this]{emit newCallRequested(info_.accountId);});}
     if(ended&&!endScheduled_){endScheduled_=true;consultationPending_=false;digits_->clear();routePanel_->hide();peerPanel_->hide();setAttribute(Qt::WA_DeleteOnClose,true);if(state==LinphoneCallError)showError(info.error.isEmpty()?info.message:info.error);endTimer_->start(state==LinphoneCallError?6000:2500);}
 }

@@ -33,6 +33,7 @@ def main():
     parser.add_argument('--qt', type=Path, required=True)
     parser.add_argument('--sdk', type=Path, required=True)
     parser.add_argument('--keychain', type=Path, required=True)
+    parser.add_argument('--fax', type=Path, required=True)
     parser.add_argument('--ca', type=Path, required=True)
     parser.add_argument('--crt', type=Path, required=True)
     parser.add_argument('--ucrt', type=Path, required=True)
@@ -65,7 +66,7 @@ def main():
     finally:
         for alias in aliases:
             alias.unlink()
-    runtime_roots = [args.sdk / 'bin', args.sdk / 'lib', args.keychain / 'bin', args.crt, args.ucrt, args.qt / 'bin']
+    runtime_roots = [args.fax / 'bin', args.sdk / 'bin', args.sdk / 'lib', args.keychain / 'bin', args.crt, args.ucrt, args.qt / 'bin']
     for directory in runtime_roots[:-1]:
         files = list(directory.glob('*.dll'))
         # Autotools-built SDK codecs (notably OpenH264) install DLLs in lib.
@@ -86,6 +87,7 @@ def main():
     shutil.copytree(ROOT / 'LICENSES', stage / 'LICENSES')
     if args.notices:
         shutil.copytree(args.notices, stage / 'share/licenses')
+    shutil.copytree(ROOT / 'packaging/fonts', stage / 'share/licenses/fax-font')
     (stage / 'qt.conf').write_text('[Paths]\nPrefix=.\nPlugins=.\n')
     search = {p.name.lower(): p for directory in runtime_roots for p in directory.glob('*.dll')}
     system = Path(os.environ['SystemRoot']) / 'System32'

@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
 import os
 import pathlib
+import re
 import sys
 
 root = pathlib.Path(sys.argv[1])
+# SDK source builds use imported CMake targets whose versioned runtime files
+# may already be installed on the host and therefore absent from apt's cache.
+for package in (root / 'usr').rglob('*.cmake'):
+    for relative in re.findall(r'\$\{_IMPORT_PREFIX\}(/[^";]+)', package.read_text(errors='replace')):
+        destination = root / 'usr' / relative.lstrip('/')
+        installed = pathlib.Path('/usr') / relative.lstrip('/')
+        if not destination.exists() and not destination.is_symlink() and installed.is_file():
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.symlink_to(installed)
 for p in root.rglob('*'):
     if p.is_symlink() and not p.exists():
         target = os.readlink(p)

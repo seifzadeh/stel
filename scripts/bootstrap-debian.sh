@@ -6,7 +6,7 @@ apt-get --download-only --yes -o Debug::NoLocking=1 \
   -o "Dir::Cache::archives=$STEL_PROJECT_DIR/.deps/debs" install \
   cmake ninja-build ripgrep qtbase5-dev qtbase5-dev-tools liblinphone-dev \
   libmediastreamer-dev libbctoolbox-dev libbelr-dev libortp-dev libbellesip-dev \
-  libaom-dev libdav1d-dev libavcodec-dev libavutil-dev libswscale-dev qtkeychain-qt5-dev zlib1g-dev patchelf
+  libaom-dev libdav1d-dev libavcodec-dev libavutil-dev libswscale-dev qtkeychain-qt5-dev libspandsp-dev libtiff-dev zlib1g-dev patchelf
 for package in "$STEL_PROJECT_DIR"/.deps/debs/*.deb; do
   dpkg-deb -x "$package" "$STEL_PROJECT_DIR/.deps/root"
 done
