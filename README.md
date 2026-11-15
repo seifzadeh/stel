@@ -1,71 +1,78 @@
 <p align="center"><img src="packaging/icons/stel-128.png" width="96" alt="Stel"></p>
 <h1 align="center">Stel</h1>
-<p align="center">A compact, open-source, multi-account SIP softphone built with Qt and liblinphone.</p>
-<p align="center"><a href="https://seifzadeh.github.io/stel/">Website</a> · <a href="https://github.com/seifzadeh/stel/releases">Downloads</a> · <a href="README.fa.md">فارسی</a> · <a href="docs/BUILDING.md">Build</a> · <a href="docs/RELEASE.md">Release guide</a></p>
+<p align="center">A SIP softphone for Windows and Linux, built on liblinphone.</p>
+<p align="center"><a href="https://seifzadeh.github.io/stel/">Website</a> · <a href="https://github.com/seifzadeh/stel/releases">Download</a> · <a href="README.fa.md">فارسی</a></p>
+
+Stel brings your PBX accounts to the desktop. Make voice and video calls,
+exchange messages, and send or receive faxes from a Qt/C++ application.
 
 ![Stel desktop](website/assets/main-window.png)
 
-Fax is available from the main **Fax** tab and the incoming call window. Choose
-T.38 (default) or G.711 pass-through for each call, type a message or select a
-PDF/TXT/TIFF/PNG/JPEG document. Stel prepares standard A4 pages automatically,
-with Persian text support and an internal multipage preview. Browse/export
-received faxes below the send form. See [the fax guide](docs/FAX.md) for protocol,
-document and build requirements.
+## Features
 
-Stel provides voice and video calling, multiple SIP accounts, a separate dialog
-for each call, DTMF, hold, blind/attended transfer, forwarding and conferencing.
-Settings include live account registration status, per-account Auto Answer and
-Caller ID Name, audio/video codec preferences, network binding and dummy devices
-for testing without a physical microphone or camera. Settings → About shows the
-application version and dependency credits.
+1. **Built on liblinphone**<br>
+   Uses the Linphone SIP and media engine, with a desktop interface written in Qt/C++.
 
-The second tab, **Messages**, provides SIP MESSAGE chat for each account. It keeps
-local conversation history, unread counts and send results. The interface stays
-LTR; Persian, mixed Persian/English text, ZWNJ, emoji and multiline text use Qt's
-Unicode text handling. Enter sends and Shift+Enter inserts a newline. Messaging
-requires support from the SIP peer/PBX; a server acknowledgement is labelled
-**Sent**, not read by the recipient. This is SIP messaging, not a cellular SMS gateway.
+2. **Multiple accounts, with no fixed limit**<br>
+   Connect to several PBXs at once. Add, edit, remove, register or unregister each
+   account in Settings, and see its registration result immediately.
 
-SIP UDP/TCP/TLS and client-certificate authentication are supported. New accounts
-use RTP; SRTP is an explicit account setting. WebRTC-compatible media settings are
-available for compatible SIP gateways; generic WSS signalling and SIP-over-SCTP
-are **not implemented**. Codec availability is discovered from the actual SDK.
+3. **Separate signalling and media**<br>
+   Choose a local IP for SIP and another for audio/video. Set SIP ports and media
+   port ranges separately, including on machines with multiple network interfaces.
 
-## Downloads and compatibility
+4. **Voice and video calls**<br>
+   Each call has its own window. Answer or reject calls, send DTMF, hold, mute,
+   record, transfer, forward, or join calls in a conference.
 
-Use the native Linux `.run` or Windows portable `.exe` from
-[Releases](https://github.com/seifzadeh/stel/releases). Application libraries,
-plugins, public trust roots and notices are bundled; no shell launcher or manual
-library loading is needed. The runtime is bundled, **not fully statically linked**.
-OS loaders, drivers and desktop/audio services remain system components.
+5. **Messaging**<br>
+   Send and receive SIP MESSAGE in a chat view for each account. Conversations
+   have history and unread counts, with support for Persian, English and mixed text.
 
-- Linux x86_64: built in Debian 13; the exact minimum glibc is recorded in each
-  bundle's `bundle-manifest.json`.
-- Windows x64: Qt 5.15.2, MSVC v142, matching source-built SDK, CRT and UCRT.
-  Actions tests run on Windows Server 2022. Windows 7 SP1/8.1 are legacy targets
-  and require testing on those systems; that compatibility is not yet verified.
-- macOS, 32-bit Windows and ARM packages are not provided by the current workflow.
+6. **Send and receive fax**<br>
+   Choose T.38 (the default) or G.711 pass-through for each fax. Type text or
+   select PDF, TXT, TIFF, PNG or JPEG; Stel prepares A4 pages and lets you preview
+   them before sending. Received faxes appear in an inbox where you can open or save them.
 
-## Development and releases
+7. **Audio and video codec selection**<br>
+   Enable codecs and set their priority in Settings. Audio includes G.729, Opus,
+   G.711 and G.722; video includes H.264, VP8 and AV1. The list shows the codecs
+   available in your build.
 
-See [BUILDING](docs/BUILDING.md), [architecture](docs/ARCHITECTURE.md) and
-[CONTRIBUTING](CONTRIBUTING.md). No PBX credentials are needed: native tests use
-loopback accounts and generate their own TLS certificates.
+8. **Mutual TLS**<br>
+   Use TLS with a client certificate and private key for each account, alongside
+   server certificate verification. SIP supports UDP, TCP and TLS; media is RTP
+   by default, with SRTP available as an account setting.
 
-`CMakeLists.txt` is the single version source. A push to `main` builds and tests
-Linux and Windows. If that version has not been published, the successful workflow
-creates its `vX.Y.Z` tag and release automatically, with native binaries, archives,
-SHA-256 sums and matching source packages. Existing published versions are never
-overwritten. See [RELEASE](docs/RELEASE.md) for the first push and Pages setup.
+Also included:
 
-## Author and license
+- Auto Answer and Caller ID Name for each account.
+- Dummy microphone and camera for testing without physical devices.
+- Local contacts, recent calls and secure password storage.
 
-Principal developer: **Mehrdad Seifzadeh**  
+Messaging, fax and call transfers need support from your PBX and the other endpoint.
+
+## Get started
+
+1. Download the Windows `.exe` or Linux `.run` from [Releases](https://github.com/seifzadeh/stel/releases). Application libraries are included. On Linux, allow the file to run as a program.
+2. Open **Settings → Accounts → Add account**, enter your SIP details and press **Register**. A green status shows a successful registration.
+3. Use **Phone**, **Messages** or **Fax** and choose the account you want to use.
+
+For OS requirements, check the release notes and [build guide](docs/BUILDING.md).
+For fax setup and supported documents, see the [fax guide](docs/FAX.md).
+
+## Source and development
+
+The source is at [seifzadeh/stel](https://github.com/seifzadeh/stel).
+See [Building](docs/BUILDING.md), [Contributing](CONTRIBUTING.md) and
+[Release guide](docs/RELEASE.md). GitHub Actions builds and tests the Linux
+and Windows packages before publishing a release.
+
+## Developer and license
+
+**Mehrdad Seifzadeh**<br>
 <mehrdad.seifzadeh@gmail.com> · [github.com/seifzadeh](https://github.com/seifzadeh)
 
-Stel's original source and artwork are **GPL-3.0-or-later**. You may use, modify
-and redistribute them under the GPL. There is no warranty. Upstream components
-retain their own licenses, including AGPLv3 for liblinphone and the vendored
-Mediastreamer2 filters; those additional conditions apply to the combined work.
-See [LICENSE](LICENSE), [NOTICE](NOTICE.md), [AGPL](LICENSES/AGPL-3.0.txt) and
-[third-party notices](THIRD_PARTY.md).
+Stel's code and artwork are **GPL-3.0-or-later**. You can use, modify and share
+this project under that license. Library licenses, including liblinphone's AGPL,
+remain in place. See [LICENSE](LICENSE) and [third-party notices](THIRD_PARTY.md).

@@ -5,3 +5,9 @@
 @media(prefers-reduced-motion:reduce){:root{scroll-behavior:auto}*{transition:none!important}}
 
 .footer-content>div{min-width:0;overflow-wrap:anywhere}
+.feature-grid{list-style:none;padding:0;margin:0}
+.feature-extras{margin-top:40px;padding-top:24px;border-top:1px solid var(--line)}
+.feature-extras h3{font-size:18px;font-weight:600;margin:0 0 12px}
+.feature-extras ul{color:var(--muted);font-size:14px;padding-inline-start:20px;margin:0}
+.feature-extras li{margin-block:5px}
+.feature-note{font-size:12px;color:var(--muted);margin:24px 0 0}
