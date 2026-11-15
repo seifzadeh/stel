@@ -6,7 +6,9 @@
 Stel brings your PBX accounts to the desktop. Make voice and video calls,
 exchange messages, and send or receive faxes from a Qt/C++ application.
 
-![Stel desktop](website/assets/main-window.png)
+![Stel desktop](website/assets/screenshots/v0.9.0/main-window.png)
+
+[More screenshots](https://seifzadeh.github.io/stel/?lang=en#screenshots)
 
 ## Features
 

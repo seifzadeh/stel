@@ -6,7 +6,9 @@
 با Stel اکانت‌های PBX خودت را روی دسکتاپ داشته باش؛ تماس صوتی و تصویری بگیر،
 پیام رد و بدل کن و فکس بفرست یا دریافت کن. برنامه با Qt و C++ ساخته شده است.
 
-![صفحهٔ اصلی Stel](website/assets/main-window.png)
+![صفحهٔ اصلی Stel](website/assets/screenshots/v0.9.0/main-window.png)
+
+[تصاویر بیشتر](https://seifzadeh.github.io/stel/?lang=fa#screenshots)
 
 ## قابلیت‌ها
 

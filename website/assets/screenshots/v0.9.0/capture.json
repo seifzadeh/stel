@@ -1,0 +1,83 @@
+{
+    "captured_at": "2026-11-15T15:13:44Z",
+    "fixture": "Disposable loopback PBX, two registered demo accounts, dummy microphone and camera; real SIP messages and a two-page T.38 fax.",
+    "images": [
+        {
+            "file": "incoming-call.png",
+            "height": 780,
+            "sha256": "5a8644e95472a8ee9273b08794c124b7cd23def8a8c3ecce4f75b830c3f9c89e",
+            "width": 620
+        },
+        {
+            "file": "call.png",
+            "height": 800,
+            "sha256": "0976364cdfcdc2253952b3f7b105c460d0465153c16d4d4f1692cc444b2a958b",
+            "width": 620
+        },
+        {
+            "file": "main-window.png",
+            "height": 850,
+            "sha256": "a81d6654587f9232c7b081115942e987b575a4f3987b0381b3ebff5b1d2dbf65",
+            "width": 1080
+        },
+        {
+            "file": "video-call.png",
+            "height": 820,
+            "sha256": "a0082cdb500c32de5d9e07556bf24104799306cae4975d2c11972f77024e1320",
+            "width": 640
+        },
+        {
+            "file": "messages.png",
+            "height": 850,
+            "sha256": "bdada6294a33db8b2eaf9ef3a4418a319222fa18b08fc6bc58784d5a15007671",
+            "width": 1080
+        },
+        {
+            "file": "fax-preview.png",
+            "height": 1160,
+            "sha256": "a0211db12bbdf2e4584f26c0e826f1c6daef3202339a2b647d88ded5fd8ab0c6",
+            "width": 800
+        },
+        {
+            "file": "fax.png",
+            "height": 850,
+            "sha256": "437e15052912c7ddfcf52425bcbbe88988b6bea87c4fe96fbb9dd4ddc56444f7",
+            "width": 1080
+        },
+        {
+            "file": "accounts.png",
+            "height": 900,
+            "sha256": "e361ae4df0190a25cd1b00267dcba2358ad766fb420a315290dbb37a60d0a79f",
+            "width": 1080
+        },
+        {
+            "file": "codecs.png",
+            "height": 800,
+            "sha256": "4f54c6a727798807a1dfd3fc936f367670083a5873081de31ff6d2a369dbf9d1",
+            "width": 1080
+        },
+        {
+            "file": "video-codecs.png",
+            "height": 800,
+            "sha256": "cdc3d2e596c4f86ec098ab51fd3689dcff22bd1b2fb533975adba0fd3cabd8e5",
+            "width": 1080
+        },
+        {
+            "file": "network.png",
+            "height": 800,
+            "sha256": "0f65708bae653920af0de8fb91c9fb37fc153acc92ef2026013a59b7faea28da",
+            "width": 1080
+        },
+        {
+            "file": "about.png",
+            "height": 900,
+            "sha256": "08bee507daba83629080292550182fe8f67259e41e8db419a254c5971f9b68cd",
+            "width": 1080
+        }
+    ],
+    "liblinphone": "5.3.105",
+    "platform": "Debian GNU/Linux 13 (trixie)",
+    "qt": "5.15.15",
+    "ui_source_commit": "6874b52ee792cf4ae645941ed6984b3544e648c8",
+    "version": "0.9.0"
+}
