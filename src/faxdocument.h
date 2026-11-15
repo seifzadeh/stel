@@ -1,6 +1,7 @@
 #pragma once
 #include <QImage>
 #include <QString>
+#include <QStringList>
 #include <atomic>
 #include <memory>
 
@@ -22,6 +23,8 @@ void initializeFaxDocumentFonts(); // GUI thread, before starting a conversion w
 FaxDocumentResult convertFaxDocument(const QString &source,const QString &destination,
     const std::shared_ptr<FaxConversionControl> &control={});
 FaxDocumentResult convertFaxText(const QString &text,const QString &destination,
+    const std::shared_ptr<FaxConversionControl> &control={});
+FaxDocumentResult joinFaxDocuments(const QStringList &sources,const QString &destination,
     const std::shared_ptr<FaxConversionControl> &control={});
 bool prepareFaxDocument(const QString &source,const QString &destination,QString *error);
 QImage faxDocumentPage(const QString &path,int page,QString *error=nullptr);

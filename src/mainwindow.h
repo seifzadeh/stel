@@ -14,6 +14,7 @@ class QDialog;
 class QCloseEvent;
 namespace stel {
 class SettingsWidget;
+class DeskPhone;
 class CallDialog;
 class ChatWidget;
 class FaxWidget;
@@ -41,11 +42,11 @@ private:
     QPushButton *openCall_ = nullptr;
     QSystemTrayIcon *tray_ = nullptr;
     QTabWidget *tabs_ = nullptr;
+    DeskPhone *desk_ = nullptr;
     SettingsWidget *settings_ = nullptr;
     ChatWidget *chat_ = nullptr;
     FaxWidget *fax_ = nullptr;
     QDialog *settingsDialog_ = nullptr;
-    QWidget *callAccountBar_ = nullptr;
     QHash<QString,CallInfo> callCache_;
     QHash<QString,QPointer<CallDialog>> callDialogs_;
     QHash<QString,QString> accountStates_;
@@ -60,7 +61,6 @@ private:
     void refreshHistory();
     void appendLog(const QString &);
     QString selectedCall() const;
-    QWidget *createPhone();
     QWidget *createContacts();
     QWidget *createHistory();
     QWidget *createSettings();

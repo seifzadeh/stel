@@ -73,8 +73,10 @@ int main(int argc,char **argv){
             account.password="stel-local-screenshot-demo";accounts<<account;
         }
         QString error;require(store.save(accounts,prefs,&error),qPrintable(error));
+        require(store.saveContacts({{{"name","Office"},{"uri","1001"}},
+            {{"name",QString::fromUtf8("پشتیبانی / Support")},{"uri","1002"}}}),"Cannot save demo contacts");
         MainWindow window(state.path());require(window.ready(),"Application could not start");
-        window.resize(1080,850);window.show();auto *engine=child<SipEngine>(window,"");
+        window.resize(1448,1086);window.show();auto *engine=child<SipEngine>(window,"");
         auto *pages=child<QTabWidget>(window,"mainPages");
         waitFor([&]{return pbx.registered("1001")&&pbx.registered("1002");},"Demo accounts did not register");
         QJsonArray images;
@@ -93,7 +95,7 @@ int main(int argc,char **argv){
         auto *incoming=callDialog(window,true);incoming->resize(620,780);capture(*incoming,"incoming-call");
         child<QPushButton>(*incoming,"callAnswer")->click();waitFor([&]{return running(*engine);},"Voice call did not connect");
         auto *outgoing=callDialog(window,false);outgoing->resize(620,800);
-        child<QPushButton>(*outgoing,"callDtmf_5")->click();QTest::qWait(1200);capture(*outgoing,"call");capture(window,"main-window");
+        child<QPushButton>(*outgoing,"callDtmf_5")->click();QTest::qWait(1200);capture(*outgoing,"call");
         const auto hangup=[&]{for(const auto &call:engine->calls())engine->hangup(call.id);waitFor([&]{return engine->calls().isEmpty();},"Calls did not end");QTest::qWait(2700);};
         hangup();
         require(engine->dial(accounts[0].id,"1002",true),"Cannot place demo video call");
@@ -135,7 +137,7 @@ int main(int argc,char **argv){
         });
         previewTimer.start();child<QPushButton>(*fax,"faxPreview")->click();
         waitFor([&]{return previewCaptured;},"A4 preview did not open");
-        QObject::connect(engine,&SipEngine::callChanged,&window,[&](const CallInfo &call){
+        const auto faxReceiver=QObject::connect(engine,&SipEngine::callChanged,&window,[&](const CallInfo &call){
             if(call.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,engine,[&,id=call.id]{require(engine->receiveFax(id,"t38"),"Cannot receive demo fax");});
         });
         child<QPushButton>(*fax,"faxSend")->click();
@@ -143,11 +145,23 @@ int main(int argc,char **argv){
             require(job.state!="failed",qPrintable(job.detail));completed+=job.state=="completed"&&job.pages==2;
         }return completed==2;},"Two-page fax did not complete",100000);
         waitFor([&]{return engine->calls().isEmpty();},"Fax call did not close");QTest::qWait(2700);
-        auto *inbox=child<QTableWidget>(*fax,"receivedFaxes");require(inbox->rowCount()==1,"Received fax is missing");inbox->selectRow(0);capture(window,"fax");
+        QObject::disconnect(faxReceiver);
+        auto *inbox=child<QTableWidget>(*fax,"receivedFaxes");require(inbox->rowCount()==1,"Received fax is missing");
+        child<QPushButton>(*fax,"faxDeskTab1")->click();inbox->selectRow(0);capture(window,"fax");
+        child<QPushButton>(*fax,"faxDeskTab2")->click();
+        auto *outbox=child<QTableWidget>(*fax,"sentFaxes");require(outbox->rowCount()==1,"Sent fax is missing");outbox->selectRow(0);capture(window,"fax-outbox");
+        child<QPushButton>(*fax,"faxDeskTab0")->click();capture(window,"fax-send");pages->setCurrentIndex(0);
+        require(engine->dial(accounts[0].id,"1002",false),"Cannot place the main-screen demo call");
+        waitFor([&]{return callDialog(window,true);},"Main-screen incoming call did not open");
+        child<QPushButton>(*callDialog(window,true),"callAnswer")->click();waitFor([&]{return running(*engine);},"Main-screen call did not connect");
+        QTest::qWait(1200);capture(window,"main-window");hangup();
+        child<QLineEdit>(window,"dialTarget")->clear();capture(window,"main-idle");
+        pages->setCurrentIndex(3);capture(window,"contacts");
+        pages->setCurrentIndex(4);capture(window,"history");
 
         window.showSettings();auto *settings=child<QDialog>(window,"settingsDialog");settings->resize(1080,900);
         auto *settingsPages=child<QTabWidget>(*settings,"settingsPages");
-        for(const auto &entry:QList<QPair<int,QString>>{{0,"accounts"},{1,"codecs"},{2,"video-codecs"},{3,"network"},{5,"about"}}){
+        for(const auto &entry:QList<QPair<int,QString>>{{0,"accounts"},{1,"codecs"},{2,"video-codecs"},{3,"network"},{4,"security"},{5,"about"}}){
             settings->resize(1080,entry.first==0||entry.first==5?900:800);settingsPages->setCurrentIndex(entry.first);
             if(entry.first==1){
                 auto *codecs=child<QListWidget>(*settings,"audioCodecs");QListWidgetItem *g729=nullptr;
@@ -157,6 +171,11 @@ int main(int argc,char **argv){
                 child<QPushButton>(*settings,"audioApplyCodecs")->click();
             }
             capture(*settings,entry.second);
+        }
+        settingsPages->setCurrentIndex(0);settings->resize(1080,900);
+        auto *accountPages=child<QTabWidget>(*settings,"accountTabs");
+        for(const auto &entry:QList<QPair<int,QString>>{{1,"account-security"},{2,"account-nat"},{3,"account-forwarding"}}){
+            accountPages->setCurrentIndex(entry.first);capture(*settings,entry.second);
         }
         QJsonObject manifest{{"version",QString::fromLatin1(STEL_VERSION)},{"qt",QString::fromLatin1(qVersion())},
             {"liblinphone",QString::fromUtf8(linphone_core_get_version())},{"platform",QSysInfo::prettyProductName()},

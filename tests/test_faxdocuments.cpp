@@ -1,6 +1,7 @@
 #include "faxdocument.h"
 #include "faxwidget.h"
 #include <QComboBox>
+#include <QCheckBox>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFile>
@@ -60,6 +61,14 @@ private slots:
         for(int n=0;n<encoded.size();++n){QFile file(tmp.path()+"/encoding.txt");QVERIFY(file.open(QIODevice::WriteOnly));file.write(encoded[n]);file.close();const auto dest=tmp.path()+"/encoded.tif";const auto result=convertFaxDocument(file.fileName(),dest);QVERIFY2(result.ok,qPrintable(result.error));QCOMPARE(faxDocumentPage(dest,0),expected);}
         QFile old(tmp.path()+"/old.txt");QVERIFY(old.open(QIODevice::WriteOnly));old.write(QByteArray::fromHex("d3e1c7e320cfe4edc7"));old.close();QVERIFY(convertFaxDocument(old.fileName(),tmp.path()+"/old.tif").ok);QVERIFY(convertFaxText(QString::fromUtf8("سلام دنیا"),tmp.path()+"/old-reference.tif").ok);QCOMPARE(faxDocumentPage(tmp.path()+"/old.tif",0),faxDocumentPage(tmp.path()+"/old-reference.tif",0));
     }
+    void coverPageIsPreservedBeforeDocument(){
+        QTemporaryDir tmp;const auto cover=tmp.path()+"/cover.tif",body=tmp.path()+"/body.tif",joined=tmp.path()+"/joined.tif";
+        QVERIFY(convertFaxText(QString::fromUtf8("FAX\nبه: دفتر\nموضوع: آزمایش برگهٔ همراه"),cover).ok);
+        QVERIFY(convertFaxText("Document page one\fDocument page two",body).ok);
+        auto result=joinFaxDocuments({cover,body},joined);QVERIFY2(result.ok,qPrintable(result.error));QCOMPARE(result.pages,3);verifyA4(joined,3);
+        QCOMPARE(faxDocumentPage(joined,0),faxDocumentPage(cover,0));QCOMPARE(faxDocumentPage(joined,1),faxDocumentPage(body,0));QCOMPARE(faxDocumentPage(joined,2),faxDocumentPage(body,1));
+        auto control=std::make_shared<FaxConversionControl>();control->cancelled=true;const auto cancelled=tmp.path()+"/cancelled.tif";QVERIFY(joinFaxDocuments({cover,body},cancelled,control).cancelled);QVERIFY(!QFile::exists(cancelled));
+    }
     void pdfMixedPageSizes(){
         QTemporaryDir tmp;const auto source=pdf(tmp.path()),dest=tmp.path()+"/pdf.tif";const auto result=convertFaxDocument(source,dest);QVERIFY2(result.ok,qPrintable(result.error));QCOMPARE(result.pages,3);verifyA4(dest,3);
         for(int n=0;n<3;++n){auto image=faxDocumentPage(dest,n);const auto bounds=ink(image);QVERIFY(!bounds.isEmpty());QVERIFY(bounds.left()>=98&&bounds.right()<=1630);QVERIFY(bounds.top()>=75&&bounds.bottom()<=2218);screenshot(image,"fax-pdf-page-"+QString::number(n+1));}
@@ -85,6 +94,14 @@ private slots:
         auto *send=widget.findChild<QPushButton*>("faxSend"),*cancel=widget.findChild<QPushButton*>("faxCancel");QVERIFY(send->isEnabled());send->click();QVERIFY(cancel->isEnabled());cancel->click();
         QTRY_COMPARE_WITH_TIMEOUT(widget.findChild<QLabel*>("faxActivity")->text(),QString("Conversion cancelled."),15000);
         QVERIFY(engine.faxes().isEmpty());QVERIFY(engine.lastError().isEmpty());QVERIFY(send->isEnabled());QVERIFY(!cancel->isEnabled());
+    }
+    void deskFaxCoverPreview(){
+        SipEngine engine;FaxWidget widget(engine,nullptr,true);widget.resize(539,410);widget.show();
+        widget.findChild<QComboBox*>("faxSource")->setCurrentIndex(1);widget.findChild<QCheckBox*>("faxCoverPage")->setChecked(true);
+        QTimer::singleShot(0,&widget,[&]{auto *dialog=widget.findChild<QDialog*>("faxTextDialog");QVERIFY(dialog);dialog->findChild<QPlainTextEdit*>("faxTextInput")->setPlainText("First document page\fSecond document page");dialog->findChild<QDialogButtonBox*>()->button(QDialogButtonBox::Ok)->click();});
+        widget.findChild<QPushButton*>("faxEditText")->click();
+        bool previewed=false;QTimer close;close.setInterval(20);connect(&close,&QTimer::timeout,&widget,[&]{auto *dialog=widget.findChild<QDialog*>("faxPreviewDialog");if(!dialog||!dialog->isVisible())return;QVERIFY(dialog->findChild<QLabel*>("faxPreviewPage")->text().contains("1 / 3"));previewed=true;dialog->reject();close.stop();});close.start();widget.findChild<QPushButton*>("faxPreview")->click();QTRY_VERIFY_WITH_TIMEOUT(previewed,15000);
+        widget.findChild<QPushButton*>("faxDeskTab1")->click();QVERIFY(!widget.findChild<QLineEdit*>("faxTarget")->isVisible());widget.findChild<QPushButton*>("faxDeskTab0")->click();QVERIFY(widget.findChild<QLineEdit*>("faxTarget")->isVisible());
     }
 };
 QTEST_MAIN(FaxDocumentTests)

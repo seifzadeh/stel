@@ -217,6 +217,15 @@ FaxDocumentResult convertFaxDocument(const QString &source,const QString &destin
     if(reader.imageCount()>1)return failure(destination,"Use TIFF or PDF for multipage documents.");
     TiffWriter writer(destination);if(!writer.valid()||!writer.write(fitImage(image),0,1))return failure(destination,"Cannot write the fax document.");progress(control,1,1);return {true,false,1,{}};
 }
+FaxDocumentResult joinFaxDocuments(const QStringList &sources,const QString &destination,const std::shared_ptr<FaxConversionControl> &control){
+    for(const auto &source:sources)if(QFileInfo(source)==QFileInfo(destination))return {false,false,0,"Choose a separate destination for the combined fax."};
+    int pages=0;QVector<int> counts;
+    for(const auto &source:sources){std::unique_ptr<TIFF,decltype(&TIFFClose)> input(openTiff(source,"r"),TIFFClose);if(!input)return failure(destination,"Cannot open a fax document.");int count=0;do{++count;if(++pages>MaxPages)return failure(destination,"The fax exceeds the page limit.");}while(TIFFReadDirectory(input.get()));counts<<count;}
+    if(!pages)return failure(destination,"The fax has no pages.");
+    TiffWriter writer(destination);if(!writer.valid())return failure(destination,"Cannot create the fax document.");int page=0;
+    for(int n=0;n<sources.size();++n){std::unique_ptr<TIFF,decltype(&TIFFClose)> input(openTiff(sources[n],"r"),TIFFClose);if(!input)return failure(destination,"Cannot open a fax document.");for(int i=0;i<counts[n];++i){if(cancelled(control))return failure(destination,"Conversion cancelled.",true);TIFFSetDirectory(input.get(),tdir_t(i));QString error;const auto image=readTiffPage(input.get(),&error);if(image.isNull())return failure(destination,error);if(image.size()!=QSize(FaxPageWidth,FaxPageHeight))return failure(destination,"The fax page is not standard A4.");if(!writer.write(image,page++,pages))return failure(destination,"Cannot write the fax document.");progress(control,page,pages);}}
+    return {true,false,pages,{}};
+}
 bool prepareFaxDocument(const QString &source,const QString &destination,QString *error){auto result=convertFaxDocument(source,destination);if(error)*error=result.error;return result.ok;}
 QImage faxDocumentPage(const QString &path,int page,QString *error){
     std::unique_ptr<TIFF,decltype(&TIFFClose)> input(openTiff(path,"r"),TIFFClose);

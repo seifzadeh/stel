@@ -186,8 +186,10 @@ private slots:
         QVERIFY2(waitFor([&]{const auto calls=e.calls();if(calls.size()!=2)return false;for(const auto &i:calls)if(i.rawState!=LinphoneCallStreamsRunning||i.audioDownKbps<=0)return false;return true;},10000),qPrintable(events.join('\n')));
         QCOMPARE(pbx.invites,1);QVERIFY(pbx.answers>=1);QVERIFY(!outgoing.isEmpty());
         for(const auto &i:e.calls()){QVERIFY(i.accountId=="alice"||i.accountId=="bob");QVERIFY(i.encryption.contains(security=="srtp"?"srtp":"none",Qt::CaseInsensitive));}
-        QVERIFY(e.hold(outgoing,true));QVERIFY(waitFor([&]{int paused=0;for(const auto &i:e.calls())paused+=i.rawState==LinphoneCallPaused||i.rawState==LinphoneCallPausedByRemote;return paused==2;}));
-        QVERIFY(e.hold(outgoing,false));QVERIFY(waitFor([&]{int running=0;for(const auto &i:e.calls())running+=i.rawState==LinphoneCallStreamsRunning;return running==2;}));
+        for(const auto &heldCall:{outgoing,incoming}){
+            QVERIFY(e.hold(heldCall,true));QVERIFY(waitFor([&]{int paused=0;for(const auto &i:e.calls())paused+=i.rawState==LinphoneCallPaused||i.rawState==LinphoneCallPausedByRemote;return paused==2;}));
+            QVERIFY(e.hold(heldCall,false));QVERIFY(waitFor([&]{int running=0;for(const auto &i:e.calls())running+=i.rawState==LinphoneCallStreamsRunning;return running==2;}));
+        }
         QVERIFY(e.record(incoming,true));QVERIFY(e.record(outgoing,true));QTest::qWait(600);QVERIFY(e.record(incoming,false));QVERIFY(e.record(outgoing,false));
         QVERIFY(e.hangup(outgoing));QVERIFY(waitFor([&]{return e.calls().isEmpty();}));
         QCOMPARE(linphone_core_get_media_resource_mode(e.native()),LinphoneExclusiveMediaResources);

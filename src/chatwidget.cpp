@@ -90,6 +90,25 @@ ChatWidget::ChatWidget(SipEngine &engine,Store &store,QWidget *parent):QWidget(p
     refreshConversations();refreshMessages();updateSend();
 }
 QString ChatWidget::key(const QString &account,const QString &peer) const{return account+'\n'+peer;}
+void ChatWidget::setDeskMode(){
+    deskMode_=true;
+    layout()->setContentsMargins(6,6,6,6);layout()->setSpacing(7);
+    if(auto *sidebar=conversations_->parentWidget()){sidebar->setMinimumWidth(110);sidebar->setMaximumWidth(130);}
+    for(auto *row:findChildren<QHBoxLayout*>())row->setSpacing(5);
+    for(auto *column:findChildren<QVBoxLayout*>())column->setSpacing(5);
+    account_->setMinimumWidth(80);account_->setMaximumWidth(130);recipient_->setMinimumWidth(0);recipient_->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
+    for(auto *b:findChildren<QPushButton*>()){if(b->text()=="Settings")b->hide();if(b->objectName()=="newConversation")b->setText("+ New chat");}
+    send_->setMinimumWidth(43);notice_->setToolTip(notice_->text());notice_->clear();
+    composer_->setMinimumHeight(42);composer_->setMaximumHeight(55);
+    heading_->setStyleSheet("font-size:12px;color:#e8f4ff;padding:0;");notice_->setStyleSheet("font-size:10px;color:#c2d7eb;");notice_->setMaximumHeight(28);
+    send_->setStyleSheet("QPushButton {background:#0879d9;color:white;border:1px solid #45b9ff;border-radius:5px;padding:4px;} QPushButton:disabled {background:#36526f;color:#9bafc4;}");
+    setStyleSheet(R"(QWidget#messagesPage {background:rgba(9,31,57,230);border:1px solid #5287b8;border-radius:9px;}
+        QLineEdit,QComboBox,QPlainTextEdit {background:#eef5fc;color:#1b3045;border:1px solid #6c92b8;border-radius:4px;padding:3px;font-size:11px;}
+        QPushButton {background:#224e7a;color:#eff7ff;border:1px solid #5889b7;border-radius:4px;padding:4px;font-size:11px;}
+        QListWidget {background:#132f4b;color:#edf6ff;border:1px solid #3b638a;padding:2px;font-size:11px;}
+        QListWidget::item {padding:5px;border-bottom:1px solid #315779;} QListWidget::item:selected {background:#1262a4;color:white;}
+        QScrollArea {background:#dce7f2;border:0;} QLabel#muted {color:#d2e7fa;font-size:10px;})");
+}
 QString ChatWidget::accountLabel(const QString &id) const {
     for(const auto &account:accounts_)if(account.id==id)return account.label.isEmpty()?account.username+'@'+account.domain:account.label;
     return "Removed account";
@@ -164,21 +183,21 @@ void ChatWidget::refreshConversations(){
 }
 void ChatWidget::refreshMessages(bool bottom){
     const int previous=scroll_->verticalScrollBar()->value();const bool atBottom=bottom||previous>=scroll_->verticalScrollBar()->maximum()-24;
-    auto *content=new QWidget;auto *layout=new QVBoxLayout(content);layout->setContentsMargins(8,10,8,10);layout->setSpacing(12);
+    auto *content=new QWidget;auto *layout=new QVBoxLayout(content);layout->setContentsMargins(deskMode_?5:8,deskMode_?5:10,deskMode_?5:8,deskMode_?5:10);layout->setSpacing(deskMode_?6:12);
     heading_->setText(currentPeer_.isEmpty()?"Messages":currentPeer_+"  ·  "+accountLabel(currentAccount_));
     QVector<MessageInfo> selected;for(const auto &m:messages_)if(m.accountId==currentAccount_&&m.peer==currentPeer_)selected.append(m);
     if(selected.isEmpty()){
         auto *empty=plainLabel(currentPeer_.isEmpty()?"Your conversations appear here.\nChoose an account and a recipient to start chatting.":"No messages yet.\nWrite your first message below.");
-        empty->setObjectName("emptyConversation");empty->setWordWrap(true);empty->setAlignment(Qt::AlignCenter);empty->setStyleSheet("color:#7a8995;font-size:14px;padding:30px;");layout->addStretch();layout->addWidget(empty);layout->addStretch();
+        empty->setObjectName("emptyConversation");empty->setWordWrap(true);empty->setAlignment(Qt::AlignCenter);empty->setStyleSheet(deskMode_?"color:#647c92;font-size:12px;padding:6px;":"color:#7a8995;font-size:14px;padding:30px;");layout->addStretch();layout->addWidget(empty);layout->addStretch();
     }else{
         if(selected.size()>visibleLimit_){auto *earlier=new QPushButton("Load earlier messages");layout->addWidget(earlier);connect(earlier,&QPushButton::clicked,this,[this]{visibleLimit_+=100;refreshMessages();});}
         for(int n=qMax(0,int(selected.size())-visibleLimit_);n<selected.size();++n){
             const auto &m=selected[n];auto *row=new QHBoxLayout;row->setContentsMargins(0,0,0,0);auto *bubble=new QFrame;bubble->setObjectName("messageBubble");bubble->setMaximumWidth(560);
             bubble->setProperty("messageId",m.id);bubble->setProperty("incoming",m.incoming);
-            bubble->setStyleSheet(QString("QFrame#messageBubble{background:%1;border:1px solid %2;border-radius:10px;} ").arg(m.incoming?"#ffffff":"#e0f3ee",m.incoming?"#dbe4e9":"#bbddd3"));
-            auto *inside=new QVBoxLayout(bubble);inside->setContentsMargins(13,10,13,9);inside->setSpacing(6);
+            bubble->setStyleSheet(QString("QFrame#messageBubble{background:%1;border:1px solid %2;border-radius:10px;} ").arg(m.incoming?"#ffffff":deskMode_?"#dcefff":"#e0f3ee",m.incoming?"#dbe4e9":deskMode_?"#9fc9ea":"#bbddd3"));
+            auto *inside=new QVBoxLayout(bubble);inside->setContentsMargins(deskMode_?8:13,deskMode_?6:10,deskMode_?8:13,deskMode_?5:9);inside->setSpacing(deskMode_?3:6);
             auto *body=plainLabel(m.text);body->setObjectName("messageBody");body->setWordWrap(true);body->setTextInteractionFlags(Qt::TextSelectableByMouse|Qt::TextSelectableByKeyboard);body->setSizePolicy(QSizePolicy::Preferred,QSizePolicy::Preferred);
-            body->setStyleSheet("font-size:14px;color:#213344;");inside->addWidget(body);
+            body->setStyleSheet(deskMode_?"font-size:12px;color:#213344;":"font-size:14px;color:#213344;");inside->addWidget(body);
             auto *state=plainLabel(m.timestamp.toLocalTime().toString("yyyy-MM-dd HH:mm")+"  ·  "+messageStateLabel(m));state->setObjectName("messageDeliveryState");state->setStyleSheet("font-size:10px;color:#647887;");inside->addWidget(state);
             if(!m.error.isEmpty()){
                 auto *error=plainLabel((m.sipStatus?"SIP "+QString::number(m.sipStatus)+" · ":QString())+m.error);error->setObjectName("messageError");error->setWordWrap(true);error->setStyleSheet("color:#b33748;font-size:11px;");inside->addWidget(error);
@@ -194,6 +213,7 @@ void ChatWidget::refreshMessages(bool bottom){
         }
         layout->addStretch();
     }
+    if(deskMode_)content->setStyleSheet("background:#dce7f2;");
     auto *old=scroll_->takeWidget();scroll_->setWidget(content);if(old)old->deleteLater();
     QTimer::singleShot(0,this,[this,atBottom,previous]{auto *bar=scroll_->verticalScrollBar();bar->setValue(atBottom?bar->maximum():previous);});
 }

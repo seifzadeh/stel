@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.0 — 2026-11-15
+
+- Rebuild the main window around the silver desk-phone reference: handset, blue
+  display, vertical navigation, line status, illuminated keys and physical dial pad.
+- Keep the fax panel alongside the phone, with Send Fax, Inbox and Outbox,
+  document thumbnails and optional editable A4 cover pages.
+- Connect the physical keys to live calls, DTMF, hold, mute, recording, transfer,
+  conference, redial and audio output selection. Retain per-call dialogs.
+- Scale the whole chassis uniformly, support dragging/resizing and custom window
+  controls, and align the logo and dialogs with the blue/silver appearance.
+- Exercise the hardware controls on real loopback calls and verify cover-page
+  order, A4 geometry and the three-page preview.
+- Respect shared media when resuming either end of a call between accounts in
+  the same application; avoid automatically placing the other end on hold.
+
 ## 0.9.0 — 2026-11-15
 
 - Fix a call-recording crash on Windows: copy the assigned recording path before

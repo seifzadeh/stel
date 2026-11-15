@@ -13,6 +13,7 @@ mkdir -m 700 "$XDG_RUNTIME_DIR" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_
 unset GNOME_KEYRING_CONTROL GNOME_KEYRING_PID
 export QT_QPA_PLATFORM=offscreen
 export STEL_SCREENSHOT_REVISION="$(git -C "$STEL_CAPTURE_PROJECT" rev-parse HEAD)"
+if ! git -C "$STEL_CAPTURE_PROJECT" diff --quiet; then export STEL_SCREENSHOT_REVISION="$STEL_SCREENSHOT_REVISION+working-tree"; fi
 dbus-run-session -- bash -euo pipefail -s -- "$STEL_CAPTURE_BUILD/stel_screenshots" "$STEL_CAPTURE_OUTPUT" <<'SESSION'
 trap 'gnome-keyring-daemon --quit --control-directory "$XDG_RUNTIME_DIR/keyring" >/dev/null 2>&1 || true' EXIT
 printf '%s' 'stel-screenshot-disposable-keyring' | gnome-keyring-daemon --unlock --components=secrets --control-directory "$XDG_RUNTIME_DIR/keyring"

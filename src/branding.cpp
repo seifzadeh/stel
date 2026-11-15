@@ -34,7 +34,7 @@ public:
         const qreal side=qMin(rect.width(),rect.height());
         p->translate(rect.x()+(rect.width()-side)/2,rect.y()+(rect.height()-side)/2);p->scale(side/24.0,side/24.0);
         const QColor color=mode==QIcon::Disabled?QColor("#a6b4bf"):
-            (state==QIcon::On||mode==QIcon::Selected||mode==QIcon::Active)?QColor("#08796b"):QColor("#647d8c");
+            (state==QIcon::On||mode==QIcon::Selected||mode==QIcon::Active)?QColor("#0879c9"):QColor("#647d8c");
         p->setPen(QPen(color,1.75,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));p->setBrush(Qt::NoBrush);
         QPainterPath path;
         switch(icon_){
@@ -100,9 +100,9 @@ void styleNavigationTabs(QTabWidget *pages,NavigationLevel level){
             background:%1; color:#607786; border:1px solid %2; border-radius:%3px;
             padding:%4px %5px; margin:0px %6px 0px 0px; min-height:%7px; font-weight:500;
         }
-        QTabBar::tab:hover { background:#e8f5f0; color:#206e60; border-color:#bcded4; }
-        QTabBar::tab:selected { background:#def3ec; color:#087567; border:1px solid #a6d6c8; font-weight:600; }
-        QTabBar::tab:selected:focus { border:1px solid #138e81; }
+        QTabBar::tab:hover { background:#e6f2fc; color:#206ba9; border-color:#b9d8ef; }
+        QTabBar::tab:selected { background:#deedfc; color:#0875c7; border:1px solid #9fc9eb; font-weight:600; }
+        QTabBar::tab:selected:focus { border:1px solid #087ed9; }
         QTabBar::tab:disabled { color:#a4b1ba; background:#edf1f4; border-color:#e4eaee; }
         QTabBar::scroller { width:28px; }
     )").arg(settings?"#ffffff":"#eaf0f4",settings?"#dbe5eb":"#e1e9ee")

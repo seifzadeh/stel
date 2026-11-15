@@ -16,6 +16,7 @@ public:
     ChatWidget(SipEngine &,Store &,QWidget *parent=nullptr);
     void setAccounts(const QVector<Account> &);
     int unreadCount() const;
+    void setDeskMode();
 signals:
     void unreadCountChanged(int count);
     void settingsRequested();
@@ -28,7 +29,7 @@ private:
     QVector<MessageInfo> messages_;
     QHash<QString,QString> drafts_;
     QString currentAccount_,currentPeer_;
-    bool historyWritable_=true;
+    bool historyWritable_=true,deskMode_=false;
     int visibleLimit_=100;
     QComboBox *account_;
     QLineEdit *recipient_;

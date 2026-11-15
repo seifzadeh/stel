@@ -103,7 +103,7 @@ CallDialog::CallDialog(SipEngine &engine,const CallInfo &info,QWidget *parent):Q
     connect(conference_,&QPushButton::clicked,this,[this,scroll]{openPeers(PeerAction::Conference);QTimer::singleShot(0,this,[this,scroll]{scroll->ensureWidgetVisible(peerPanel_);});});
     connect(peerApply_,&QPushButton::clicked,this,&CallDialog::applyPeer);connect(cancelPeer,&QPushButton::clicked,peerPanel_,&QWidget::hide);connect(addCall_,&QPushButton::clicked,this,&CallDialog::requestNewCall);
     connect(mediaTabs_,&QTabWidget::currentChanged,this,[this](int tab){if(tab==1)bindVideo();});
-    setStyleSheet("QWidget#callBody{background:#f2f5f7;} QFrame#callIdentity{background:white;border:1px solid #d7e0e7;border-radius:8px;} QPushButton#callAnswer,QPushButton#callAnswerVideo{background:#138e81;color:white;border:0;} QPushButton#callHangup{background:#bd4052;color:white;border:0;} QPushButton:checked{background:#ddf2ee;border-color:#138e81;color:#134d48;} QLabel#callDirection{color:#607688;font-size:11px;font-weight:600;}");
+    setStyleSheet("QWidget#callBody{background:#e1e5eb;} QFrame#callIdentity{background:white;border:1px solid #d7e0e7;border-radius:8px;} QPushButton#callAnswer,QPushButton#callAnswerVideo{background:#168237;color:white;border:0;} QPushButton#callHangup{background:#bd4052;color:white;border:0;} QPushButton:checked{background:#dcecfb;border-color:#087bd2;color:#164a79;} QLabel#callDirection{color:#607688;font-size:11px;font-weight:600;}");
     for(const auto &fax:engine_.faxes())if(fax.callId==info.id)faxInfo_=fax;
     connect(&engine_,&SipEngine::faxChanged,this,[this](const FaxInfo &fax){if(fax.callId==info_.id){faxInfo_=fax;updateCall(info_,accountDetails_,transport_);}});
     updateCall(info,info.accountName,{});

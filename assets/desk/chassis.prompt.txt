@@ -1,0 +1,18 @@
+Use case: precise-object-edit.
+Asset type: production background skin for a real Qt desktop softphone.
+Edit target: the supplied STEL silver hardware telephone illustration.
+Preserve the outer silhouette, framing, proportions, perspective, brushed silver
+chassis, left black handset, vents, coiled cord, shadows, top STEL swoosh wordmark,
+handset STEL logo, glass screen bezel, five small physical LED keys, all twelve
+telephone keycaps, six utility keycaps, the green/red/silver bottom keycaps,
+top-right four window buttons, and the lower-right fax inset.
+Remove all UI writing, numbers, labels, pictograms, icons, badges and UI lines in
+both displays and all keycaps, including number legends and window controls.
+Keep keycaps blank, preserving their materials, highlights and positions.
+Upper screen: retain only the blue glass skyscraper wallpaper and blank dark
+right column; no clock, navigation, call card, avatar, status icons or text.
+Fax panel: retain only the silver inset rim and a smooth light brushed silver
+blank inner panel; no document, fields, tabs, buttons, checkboxes or status row.
+No letters except the two STEL wordmarks. Native widgets will be overlaid by code.
+Keep the reference layout exactly, with its light grey canvas and realistic
+materials. Output at 1448 × 1086 or the same 4:3 ratio. No redesign.

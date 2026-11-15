@@ -10,8 +10,10 @@ licensing. Static linking does not remove licence or corresponding-source duties
 
 Native fax uses SpanDSP 0.0.6 (LGPL-2.1/GPL source notices) and libtiff
 (permissive libtiff license). Stel's SDK T.38 extension retains liblinphone's
-AGPL-3.0-or-later terms. `packaging/dependencies.json` pins the source archives.
-The Linux package includes the exact patched SDK's original source and patch;
+AGPL-3.0-or-later terms. The SDK also respects shared media during call resume,
+so either end of a call between local accounts can leave hold without pausing
+the other. `packaging/dependencies.json` pins the source archives.
+The Linux package includes the exact patched SDK's original source and patches;
 the dependency source archive also includes the distribution's SpanDSP/libtiff
 sources. Windows sources include SpanDSP/libtiff and the MSVC build/UTF-8 adapter
 from `cmake/FaxSpandsp/`. See [FAX.md](docs/FAX.md) for the build profile.

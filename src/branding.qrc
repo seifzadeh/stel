@@ -13,6 +13,9 @@
     <file alias="stel-1024.png">../packaging/icons/stel-1024.png</file>
     <file alias="stel-wordmark.png">../packaging/stel-wordmark.png</file>
   </qresource>
+  <qresource prefix="/desk">
+    <file alias="chassis.png">../assets/desk/chassis.png</file>
+  </qresource>
   <qresource prefix="/licenses">
     <file alias="GPL-3.0.txt">../LICENSE</file>
     <file alias="AGPL-3.0.txt">../LICENSES/AGPL-3.0.txt</file>

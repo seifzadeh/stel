@@ -1,0 +1,15 @@
+--- a/src/conference/session/media-session.cpp
++++ b/src/conference/session/media-session.cpp
+@@ -4446,7 +4446,11 @@
+ 		           << Utils::toString(d->state);
+ 		return -1;
+ 	}
+-	if (!d->getParams()->getPrivate()->getInConference()) {
++	// As in startAccept(), shared media must not preempt another local leg.
++	// Resuming the incoming end of a same-core call otherwise auto-pauses its
++	// outgoing end and leaves both endpoints held through crossed re-INVITEs.
++	if (!d->getParams()->getPrivate()->getInConference() &&
++	    linphone_core_get_media_resource_mode(getCore()->getCCore()) == LinphoneExclusiveMediaResources) {
+ 		if (linphone_core_sound_resources_locked(getCore()->getCCore())) {
+ 			lWarning() << "Cannot resume MediaSession " << this
+ 			           << " because another call is locking the sound resources";

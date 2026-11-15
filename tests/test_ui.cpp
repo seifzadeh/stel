@@ -4,6 +4,7 @@
 #include "settingswidget.h"
 #include "minipbx.h"
 #include "chatwidget.h"
+#include "deskphone.h"
 #include <QInputMethodEvent>
 #include <QScrollArea>
 #include <QTextOption>
@@ -119,6 +120,33 @@ private slots:
         screenshot(window,"stel-about");
     }
     void initTestCase(){if(qEnvironmentVariableIsSet("STEL_VERBOSE_TESTS"))linphone_logging_service_set_log_level(linphone_logging_service_get(),LinphoneLogLevelMessage);}
+    void deskPhoneHardwareControls(){
+        QTemporaryDir tmp;MiniPbx pbx;stel::Store store(tmp.path());stel::Preferences prefs;prefs.inputDevice=stel::dummyMicTone();prefs.outputDevice=stel::dummySpeaker();
+        QVector<stel::Account> accounts;for(const auto &user:{"1001","1002"}){auto a=direct(user);a.server=pbx.server();a.registerEnabled=true;a.password="desk-private-test";accounts<<a;}
+        QString error;QVERIFY2(store.save(accounts,prefs,&error),qPrintable(error));
+        stel::MainWindow window(tmp.path());window.resize(1448,1086);window.show();auto *desk=window.findChild<stel::DeskPhone*>();QVERIFY(desk);QVERIFY(window.windowFlags()&Qt::FramelessWindowHint);
+        QTRY_VERIFY_WITH_TIMEOUT(pbx.registered("1001")&&pbx.registered("1002"),6000);
+        desk->account->setCurrentIndex(desk->account->findData("1001"));
+        for(const auto &digit:QString("1002"))button(window,qPrintable("deskKey_"+QString(digit)))->click();
+        QCOMPARE(desk->target->text(),QString("1002"));
+        desk->audioCall->click();QTRY_COMPARE_WITH_TIMEOUT(desk->calls->count(),2,6000);
+        for(int row=0;row<desk->calls->count();++row)if(desk->calls->item(row)->data(Qt::UserRole+2).toBool())desk->calls->setCurrentRow(row);
+        auto *incoming=dialog(window,true);QVERIFY(incoming);QTRY_VERIFY(desk->audioCall->isEnabled());desk->audioCall->click();
+        auto *engine=window.findChild<stel::SipEngine*>();QVERIFY(engine);
+        const auto running=[&]{int count=0;for(const auto &call:engine->calls())count+=call.rawState==LinphoneCallStreamsRunning;return count==2;};QTRY_VERIFY_WITH_TIMEOUT(running(),10000);
+        auto *dtmf=incoming->findChild<QLineEdit*>("callDtmfDisplay");QVERIFY(dtmf);
+        button(window,"deskKey_5")->click();QTRY_VERIFY(dtmf->text().contains('5'));QCOMPARE(desk->target->text(),QString("1002"));
+        desk->mute->click();QTRY_VERIFY(incoming->callInfo().muted);desk->mute->click();QTRY_VERIFY(!incoming->callInfo().muted);
+        QStringList holdStates;connect(engine,&stel::SipEngine::callChanged,&window,[&](const stel::CallInfo &call){holdStates<<call.accountId+" "+call.state;});
+        desk->hold->click();QTRY_COMPARE_WITH_TIMEOUT(incoming->callInfo().rawState,LinphoneCallPaused,6000);
+        const auto held=[&]{int count=0;for(const auto &call:engine->calls())count+=call.rawState==LinphoneCallPaused||call.rawState==LinphoneCallPausedByRemote;return count==2;};QTRY_VERIFY_WITH_TIMEOUT(held(),6000);
+        QCOMPARE(desk->hold->caption,QString("Resume"));QVERIFY(desk->hold->isEnabled());desk->hold->click();QTRY_VERIFY2_WITH_TIMEOUT(running(),qPrintable(holdStates.join('\n')),10000);
+        button(window,"deskNav3")->click();QCOMPARE(desk->pages->currentIndex(),1);button(window,"deskNav0")->click();QCOMPARE(desk->pages->currentIndex(),0);
+        button(window,"faxDeskTab1")->click();QVERIFY(window.findChild<QTableWidget*>("receivedFaxes")->isVisible());button(window,"faxDeskTab2")->click();QVERIFY(window.findChild<QTableWidget*>("sentFaxes")->isVisible());button(window,"faxDeskTab0")->click();QVERIFY(window.findChild<QLineEdit*>("faxTarget")->isVisible());
+        window.resize(1000,750);QTest::qWait(20);QVERIFY(desk->rect().contains(desk->hangup->geometry()));QVERIFY(desk->rect().contains(window.findChild<QWidget*>("faxPage")->geometry()));
+        desk->hangup->click();QTRY_VERIFY_WITH_TIMEOUT(engine->calls().isEmpty(),6000);QVERIFY(desk->audioCall->isEnabled());QVERIFY(!desk->hangup->isEnabled());
+        QVERIFY(store.save({},prefs));
+    }
     void answerAnotherAccountInSameWindow_data(){QTest::addColumn<bool>("video");QTest::newRow("audio")<<false;QTest::newRow("video")<<true;}
     void answerAnotherAccountInSameWindow() {
         QFETCH(bool,video);

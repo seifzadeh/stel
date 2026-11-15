@@ -18,6 +18,7 @@ for module, name in (
     ('external/mbedtls', 'mbedtls-msvc-psa-initializers.patch'),
     ('external/libyuv', 'libyuv-install-import-library.patch'),
     ('liblinphone', 'linphone-native-fax.patch'),
+    ('liblinphone', 'linphone-shared-media-resume.patch'),
 ):
     source = sdk / module
     expected = subprocess.check_output(['git', '-C', str(sdk), 'rev-parse', 'HEAD:' + module], text=True).strip()

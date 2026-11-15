@@ -12,15 +12,17 @@ spec=importlib.util.spec_from_file_location('fax_sources',ROOT/'scripts/fax-sour
 sources=importlib.util.module_from_spec(spec);spec.loader.exec_module(sources)
 
 def patch(source):
-    file=ROOT/'packaging/patches/linphone-native-fax.patch'
-    previous=source/'.stel-fax-applied.patch'
-    if subprocess.run(['git','-C',str(source),'apply','--reverse','--check',str(file)],capture_output=True).returncode:
-        if previous.exists():
-            subprocess.run(['git','-C',str(source),'apply','--reverse','--check',str(previous)],check=True)
-            subprocess.run(['git','-C',str(source),'apply','--reverse',str(previous)],check=True)
-        subprocess.run(['git','-C',str(source),'apply','--check',str(file)],check=True)
-        subprocess.run(['git','-C',str(source),'apply',str(file)],check=True)
-    shutil.copy2(file,previous)
+    for name, marker in (('linphone-native-fax.patch','.stel-fax-applied.patch'),
+                         ('linphone-shared-media-resume.patch','.stel-resume-applied.patch')):
+        file=ROOT/'packaging/patches'/name
+        previous=source/marker
+        if subprocess.run(['git','-C',str(source),'apply','--reverse','--check',str(file)],capture_output=True).returncode:
+            if previous.exists():
+                subprocess.run(['git','-C',str(source),'apply','--reverse','--check',str(previous)],check=True)
+                subprocess.run(['git','-C',str(source),'apply','--reverse',str(previous)],check=True)
+            subprocess.run(['git','-C',str(source),'apply','--check',str(file)],check=True)
+            subprocess.run(['git','-C',str(source),'apply',str(file)],check=True)
+        shutil.copy2(file,previous)
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
@@ -41,7 +43,8 @@ if __name__=='__main__':
     subprocess.run(['cmake','--build',str(work/'build'),'--target','install','--parallel','4'],check=True)
     notices=output/'share/licenses/stel-fax-sdk';notices.mkdir(parents=True,exist_ok=True)
     shutil.copy2(archive,notices/'liblinphone-5.3.105-source.tar.gz')
-    shutil.copy2(ROOT/'packaging/patches/linphone-native-fax.patch',notices)
+    for name in ('linphone-native-fax.patch','linphone-shared-media-resume.patch'):
+        shutil.copy2(ROOT/'packaging/patches'/name,notices)
     shutil.copy2(source/'LICENSE.txt',notices) if (source/'LICENSE.txt').exists() else None
     (notices/'BUILD.json').write_text(json.dumps(options,indent=2)+'\n')
     print('Fax SDK installed: '+str(output))
