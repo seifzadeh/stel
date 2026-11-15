@@ -2,6 +2,9 @@
 
 ## 0.9.0 — 2026-11-15
 
+- Fix a call-recording crash on Windows: copy the assigned recording path before
+  the SDK replaces call parameters when starting recording. Cover repeated
+  start/stop on incoming and outgoing calls and the recording notification path.
 - Send typed text, TXT and multipage PDF directly from the Fax tab; retain
   TIFF/PNG/JPEG inputs. Persian text uses a bundled Vazirmatn font.
 - Convert every page to standard A4 fine-resolution fax with safe margins,

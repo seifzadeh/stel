@@ -299,7 +299,13 @@ private slots:
         invalid=p;invalid.videoPortMin=invalid.audioPortMin;QVERIFY(!a.applyNetwork(invalid));
         Store store(tmp.path()+"/saved");QVERIFY(store.save({},p));QVector<Account> restored;Preferences saved;QVERIFY(store.load(restored,saved));QCOMPARE(saved.toJson(),p.toJson());
     }
+    void audioHoldDtmfAndRecording_data() {
+        QTest::addColumn<bool>("incomingRecorder");
+        QTest::newRow("outgoing-recording")<<false;
+        QTest::newRow("incoming-recording")<<true;
+    }
     void audioHoldDtmfAndRecording() {
+        QFETCH(bool,incomingRecorder);
         QTemporaryDir tmp;IsolatedSipEngine a,b;QVERIFY(a.start({},tmp.path()+"/a",true));QVERIFY(b.start({},tmp.path()+"/b",true));
         QVERIFY(a.addAccount(direct("alice")));QVERIFY(b.addAccount(direct("bob")));autoAnswer(b);
         int receivedDtmf=0;
@@ -312,14 +318,22 @@ private slots:
         const auto tone=tmp.path()+"/tone.wav";writeTone(tone);linphone_core_set_play_file(a.native(),tone.toUtf8().constData());
         QVERIFY(a.dial("alice",uri(b,"bob")));QVERIFY2(waitFor([&]{return streams(a)&&streams(b);}),"Both endpoints must establish RTP");
         QVERIFY2(waitFor([&]{return download(b)>0;},6000),"RTP must actually reach the other endpoint");
-        const QString id=activeId(a);QVERIFY(a.record(id,true));QTest::qWait(300);QVERIFY(a.record(id,false));
+        const QString id=activeId(a);auto &recorder=incomingRecorder?b:a;const auto recordId=activeId(recorder);
+        const auto *params=linphone_call_get_params(linphone_core_get_current_call(recorder.native()));
+        const auto recordingPath=QString::fromUtf8(linphone_call_params_get_record_file(params));QVERIFY(!recordingPath.isEmpty());
+        QSignalSpy recordingNotice(&recorder,&SipEngine::notification);
+        for(int attempt=0;attempt<3;++attempt){
+            QVERIFY(recorder.record(recordId,true));QVERIFY(recorder.calls().first().recording);
+            QVERIFY(!recordingNotice.isEmpty());QCOMPARE(recordingNotice.last()[0].toString(),"Recording: "+recordingPath);
+            QTest::qWait(150);QVERIFY(recorder.record(recordId,false));QVERIFY(!recorder.calls().first().recording);
+        }
         QVERIFY(a.dtmf(id,'5'));QVERIFY(waitFor([&]{return receivedDtmf=='5';}));
         linphone_core_remove_callbacks(b.native(),dtmfCallbacks);linphone_core_cbs_unref(dtmfCallbacks);
         QVERIFY(a.hold(id,true));QVERIFY(waitFor([&]{for(const auto &i:a.calls())if(i.rawState==LinphoneCallPaused)return true;return false;}));
         QVERIFY(a.hold(id,false));QVERIFY(waitFor([&]{return streams(a)&&streams(b);}));
         a.mute(true);QVERIFY(!linphone_core_mic_enabled(a.native()));a.mute(false);
         QVERIFY(a.hangup(id));QVERIFY(waitFor([&]{return a.calls().isEmpty()&&b.calls().isEmpty();}));
-        const auto files=QDir(tmp.path()+"/a/recordings").entryList({"*.wav"},QDir::Files);QVERIFY(!files.isEmpty());QVERIFY(QFileInfo(tmp.path()+"/a/recordings/"+files[0]).size()>44);
+        QVERIFY(QFileInfo(recordingPath).size()>44);
     }
     void encryptedVideo_data() {
         QTest::addColumn<QString>("encryption");

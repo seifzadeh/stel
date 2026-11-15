@@ -38,3 +38,26 @@ The Linux package bundles its runtime; fully static linking is not claimed.
 Detailed logs and full-size QA images are under the development workspace's
 `build/qa/fax-document*`, `pdf-qt6-*` and `fax-pdf-multipage-sip.log`, outside
 the exported application source.
+
+## Windows recording crash regression
+
+The first [0.9.0 Windows run](https://github.com/seifzadeh/stel/actions/runs/43709826018/job/132798777581)
+compiles successfully and passes core, messages, document conversion, fax and
+mutual TLS. The UI suite crashes with access violation `0xc0000005` in
+`linphone_call_params_get_record_file` while starting recording on an answered
+incoming call. The PowerShell exception reports CTest's failure; it is not the
+original fault, and line-ending warnings are unrelated.
+
+SDK 5.3.105's `Call::startRecording` calls `updateRecordState`, which replaces
+the call's parameters. `CallSessionPrivate::setParams` deletes the previous
+parameters. Stel used that borrowed object again to build the recording-path
+notification. The fix copies the path into an owned QString before the state
+change and checks recording through `linphone_call_is_recording` afterward.
+
+The strengthened core test records and stops three times for both incoming and
+outgoing calls, verifies the exact notification path, recording state and saved
+file. Before the fix both rows fail locally with corrupted path text; after the
+fix both pass with Qt 5 and Qt 6. The existing UI answer/hold/resume/record flow
+remains enabled. All six Linux CTest groups pass after the fix in 339.59 seconds;
+the repackaged native binary also passes clean standalone startup checks.
+Evidence is under `build/qa/windows-43709826018` in the development workspace.

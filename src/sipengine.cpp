@@ -481,8 +481,12 @@ bool SipEngine::record(const QString &id,bool start,const QString &path) {
     if(auto *e=owner(id);e && e!=this)return e->record(id,start,path);
     auto *c=call(id); if(!c)return fail("Call no longer exists.");
     const auto *params=linphone_call_get_params(c);
+    if(!params)return fail("Call recording parameters are unavailable.");
+    // SDK 5.3 replaces and deletes these borrowed parameters when recording
+    // starts/stops. Keep an owned path before changing the recording state.
+    const auto assignedFile=str(linphone_call_params_get_record_file(params));
     if(auto *conference=linphone_call_get_conference(c)) {
-        const auto file=path.isEmpty()?str(linphone_call_params_get_record_file(params)):path;
+        const auto file=path.isEmpty()?assignedFile:path;
         const auto result=start?linphone_conference_start_recording(conference,file.toUtf8().constData()):linphone_conference_stop_recording(conference);
         if(!status(result,"Conference recording"))return false;
         if(start)emit notification("Recording: "+file);
@@ -490,10 +494,10 @@ bool SipEngine::record(const QString &id,bool start,const QString &path) {
         return true;
     }
     if(start) {
-        if(!path.isEmpty() && path!=str(linphone_call_params_get_record_file(params)))return fail("Recording path is assigned at call setup.");
+        if(!path.isEmpty() && path!=assignedFile)return fail("Recording path is assigned at call setup.");
         linphone_call_start_recording(c);
-        if(!linphone_call_params_is_recording(linphone_call_get_params(c)))return fail("Recording could not be started.");
-        emit notification("Recording: "+str(linphone_call_params_get_record_file(params)));
+        if(!linphone_call_is_recording(c))return fail("Recording could not be started.");
+        emit notification("Recording: "+assignedFile);
     } else linphone_call_stop_recording(c);
     emit callChanged(info(c)); return true;
 }
