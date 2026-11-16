@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.0 — 2026-11-16
+
+- Receive SIP paging and intercom through Yealink-compatible Alert-Info and
+  Call-Info headers, independently of ordinary-call Auto Answer.
+- Add per-account Paging controls. Pages answer with audio only, a muted
+  microphone and a short local alert tone by default; two-way intercom is optional.
+- Preserve active calls, forwarding, DND and account media-encryption policy.
+  Show Page identity in the call window, main display and call history.
+- Cover header parsing, actual PBX INVITEs, audio reception, RTP/SRTP,
+  per-account settings, cancellation and microphone state across later calls.
+
 ## 0.10.0 — 2026-11-15
 
 - Rebuild the main window around the silver desk-phone reference: handset, blue

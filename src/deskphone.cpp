@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QDateTime>
+#include <QFontMetricsF>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -148,14 +149,16 @@ void DeskPhone::refresh(const CallInfo &call,int count,int registered,int accoun
 void DeskPhone::paintEvent(QPaintEvent *){
     QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.setRenderHint(QPainter::SmoothPixmapTransform);p.fillRect(rect(),QColor("#dce0e6"));p.translate(offset_);p.scale(scale_,scale_);p.drawPixmap(QRectF(0,0,1448,1086),chassis_,QRectF(chassis_.rect()));
     const auto text=[&](QRectF r,QString value,int size=18,bool bold=false,QColor c=QColor("#eef5ff"),int flags=Qt::AlignLeft|Qt::AlignVCenter){QFont f("Segoe UI");f.setPixelSize(size);f.setBold(bold);p.setFont(f);p.setPen(c);p.drawText(r,flags,value);};
-    const auto time=QDateTime::currentDateTime();text({316,118,193,48},time.toString("h:mm AP").section(' ',0,0),46);text({438,132,55,27},time.toString("AP"),22);text({326,167,173,26},time.toString("ddd, MMM d, yyyy"),17);
+    const auto time=QDateTime::currentDateTime();const auto clock=time.toString("h:mm AP").section(' ',0,0);
+    text({316,118,193,48},clock,46);const auto suffixX=316+QFontMetricsF(p.font()).horizontalAdvance(clock)+9;
+    text({suffixX,132,55,27},time.toString("AP"),22);text({326,167,173,26},time.toString("ddd, MMM d, yyyy"),17);
     p.setPen(QPen(QColor("#eef5ff"),2));p.setBrush(Qt::NoBrush);p.drawArc(QRectF(884,125,19,19),0,180*16);p.drawRoundedRect(QRectF(882,134,5,11),2,2);p.drawRoundedRect(QRectF(902,134,5,11),2,2);p.drawArc(QRectF(891,139,14,8),-110*16,110*16);
     paintDeskIcon(p,DeskIcon::Speaker,{918,124,26,25});for(int n=0;n<4;++n)p.fillRect(QRectF(964+n*6,144-n*5,4,6+n*5),registered_?QColor("#5be700"):QColor("#657281"));
     p.setBrush(registered_?QColor("#3cdb16"):QColor("#7a8897"));p.setPen(Qt::NoPen);p.drawEllipse(QRectF(1002,125,19,19));if(registered_)paintDeskIcon(p,DeskIcon::Check,{1003,126,17,17});text({1027,120,107,29},registered_?"SIP Registered":"SIP Offline",14);
     text({1165,117,219,36},"Lines & Status",21,true);
     if(pages->currentIndex()==0){
         QLinearGradient g(502,168,994,445);g.setColorAt(0,QColor(32,73,121,218));g.setColorAt(1,QColor(8,35,67,210));p.setBrush(g);p.setPen(QPen(QColor("#418ed0"),1));p.drawRoundedRect(QRectF(502,168,492,276),14,14);p.setPen(QColor(139,183,226,70));p.drawLine(516,211,979,211);
-        p.setPen(Qt::NoPen);p.setBrush(call_.id.isEmpty()?QColor("#8d9ca9"):QColor("#52eb0e"));p.drawEllipse(QRectF(523,183,13,13));text({546,174,325,33},call_.id.isEmpty()?"Line 1 – Ready":QString("Line %1 – %2").arg(qMax(1,calls->currentRow()+1)).arg(callStateLabel(call_.rawState)),18);
+        p.setPen(Qt::NoPen);p.setBrush(call_.id.isEmpty()?QColor("#8d9ca9"):QColor("#52eb0e"));p.drawEllipse(QRectF(523,183,13,13));text({546,174,325,33},call_.id.isEmpty()?"Line 1 – Ready":QString("Line %1 – %2").arg(qMax(1,calls->currentRow()+1)).arg(call_.paging?QString("Paging"):callStateLabel(call_.rawState)),18);
         text({879,174,98,33},QTime(0,0).addSecs(call_.duration).toString("hh:mm:ss"),18,false,QColor("#eef5ff"),Qt::AlignRight|Qt::AlignVCenter);
         QLinearGradient avatar(520,228,615,321);avatar.setColorAt(0,QColor("#487fb8"));avatar.setColorAt(1,QColor("#14446f"));p.setBrush(avatar);p.setPen(QColor("#6cc6ff"));p.drawEllipse(QRectF(522,227,94,94));p.setPen(Qt::NoPen);p.setBrush(QColor("#cee7fb"));p.drawEllipse(QRectF(556,245,27,29));QPainterPath bust;bust.moveTo(546,300);bust.cubicTo(541,271,599,271,594,300);bust.closeSubpath();p.drawPath(bust);
         text({631,225,350,39},call_.id.isEmpty()?"Ready to call":call_.remoteName.isEmpty()?call_.remoteUsername.isEmpty()?call_.remote:call_.remoteUsername:call_.remoteName,29,true);

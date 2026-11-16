@@ -24,7 +24,13 @@ streams disabled. DTLS policy is enforced at the SDK handshake stage.
 Account `autoAnswer` defaults false. Incoming policy decisions are queued outside
 the SDK callback, rechecking the UUID, current state and current account config
 before acting. Configured forwarding takes priority, then DND rejection, then
-per-account automatic audio Answer through the normal answer/shared-media path.
+per-account SIP paging, then ordinary automatic audio Answer through the normal
+answer/shared-media path. Paging markers are parsed from the initial INVITE and
+retained across SDP updates. Authorized paging sets the microphone state before
+accepting, uses a speaker when available, and never preempts another active
+call, including a call on an isolated TLS core. A local outgoing peer leg is
+recognized as the same call. Paging defaults to enabled, microphone muted and
+a short local tone; each account can change those settings.
 Stale/rejected calls are not answered. Explicit camera consent remains separate.
 
 Account `callerIdName` is distinct from the local `label`. The SDK address builder

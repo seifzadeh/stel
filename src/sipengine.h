@@ -2,6 +2,7 @@
 #include "model.h"
 #include "dummydevices.h"
 #include "faxmedia.h"
+#include "paging.h"
 #include <QObject>
 #include <QHash>
 #include <QSet>
@@ -22,6 +23,8 @@ struct CallInfo {
     LinphoneCallState rawState = LinphoneCallIdle;
     bool incoming = false, video = false, recording = false;
     bool muted = false, inConference = false;
+    bool paging = false, pagingAutoAnswered = false;
+    QString pagingHeader;
     int sipStatus = 0, conferenceParticipants = 0;
     int duration = 0;
     float audioDownKbps = 0, videoDownKbps = 0;
@@ -89,6 +92,11 @@ private:
     QHash<QString,LinphoneCall*> calls_;
     QHash<LinphoneCall*,QString> callIds_;
     QSet<LinphoneCall*> localPeerCalls_;
+    QHash<LinphoneCall*,PagingRequest> pagingRequests_;
+    QSet<LinphoneCall*> pagingAnswered_;
+    void applyIncomingPolicy(const QString &,bool pagingAlerted=false);
+    bool pagingBusy(const QString &,const Account &) const;
+    void routePagingSpeaker(LinphoneCall *);
     QHash<QString,SipEngine*> certificateCores_;
     struct PendingMessage { MessageInfo info; LinphoneChatMessageCbs *callbacks=nullptr; };
     QHash<LinphoneChatMessage*,PendingMessage> messages_;

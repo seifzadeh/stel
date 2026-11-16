@@ -14,6 +14,7 @@ struct Account {
     bool enabled = true, registerEnabled = true, ice = true, webrtc = false;
     bool rememberPassword = true;
     bool autoAnswer = false;
+    bool pagingEnabled = true, pagingMicMuted = true, pagingBeep = true;
     bool credentialsRequired = false; // Runtime state; never serialized.
     QString stunServer, turnUser, turnPassword, forwardTo;
     bool turn = false, forwardBusy = false;

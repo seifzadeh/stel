@@ -36,6 +36,7 @@ QString messageStateLabel(const MessageInfo &m) {
 QString mediaSecurityLabel(const QString &mode){if(mode=="none")return "RTP";if(mode=="dtls")return "DTLS-SRTP";return mode.toUpper();}
 QJsonObject Account::toJson() const {
     return {{"id",id},{"label",label},{"callerIdName",callerIdName},{"autoAnswer",autoAnswer},{"username",username},{"domain",domain},{"server",server},
+        {"pagingEnabled",pagingEnabled},{"pagingMicMuted",pagingMicMuted},{"pagingBeep",pagingBeep},
         {"authUser",authUser},{"transport",transport},{"certificate",certificate},{"privateKey",privateKey},
         {"encryption",encryption},{"enabled",enabled},{"register",registerEnabled},{"ice",ice},{"rememberPassword",rememberPassword},
         {"webrtc",webrtc},{"stunServer",stunServer},{"turn",turn},{"turnUser",turnUser},
@@ -47,6 +48,7 @@ Account Account::fromJson(const QJsonObject &o) {
     a.label=o["label"].toString(); a.username=o["username"].toString(); a.domain=o["domain"].toString();
     // Older versions used the local account label as their SIP display name.
     a.callerIdName=o["callerIdName"].toString(a.label);a.autoAnswer=o["autoAnswer"].toBool(false);
+    a.pagingEnabled=o["pagingEnabled"].toBool(true);a.pagingMicMuted=o["pagingMicMuted"].toBool(true);a.pagingBeep=o["pagingBeep"].toBool(true);
     a.server=o["server"].toString(); a.authUser=o["authUser"].toString();
     a.transport=o["transport"].toString("tls"); a.certificate=o["certificate"].toString();
     a.privateKey=o["privateKey"].toString(); a.encryption=o["encryption"].toString("none");

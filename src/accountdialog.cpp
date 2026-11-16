@@ -64,6 +64,11 @@ AccountEditor::AccountEditor(QWidget *parent):QWidget(parent) {
     auto *forward=form("Forwarding",NavigationIcon::Forward);edit(forward,"forwardTo","Forward incoming calls to",a.forwardTo)->setPlaceholderText("Blank = off; extension or SIP URI");
     check(forward,"forwardBusy","Forward only when busy / DND",a.forwardBusy);
     auto *forwardNote=new QLabel("Uses SIP 302 redirection while Stel is running. The PBX must permit redirects. Always-on forwarding while the app is offline must be configured on the PBX.");forwardNote->setWordWrap(true);forward->addRow(forwardNote);
+    auto *paging=form("Paging",NavigationIcon::Phone);
+    check(paging,"pagingEnabled","Accept SIP paging / intercom (Alert-Info)",a.pagingEnabled);
+    check(paging,"pagingMicMuted","Mute microphone when answering pages",a.pagingMicMuted);
+    check(paging,"pagingBeep","Play a short tone before answering a page",a.pagingBeep);
+    auto *pagingNote=new QLabel("Paging is separate from Auto Answer. Recognized Alert-Info or Call-Info requests are answered with audio only. Uncheck microphone mute for two-way intercom. A speaker is used when available; otherwise your selected audio output is used. Existing calls, Do not disturb and forwarding take priority.");pagingNote->setWordWrap(true);paging->addRow(pagingNote);
     for(auto *e:text_)connect(e,&QLineEdit::textChanged,this,[this]{dirty_=true;emit edited();});
     for(auto *c:check_)connect(c,&QCheckBox::toggled,this,[this]{dirty_=true;emit edited();});
     for(auto *c:{transport_,encryption_})connect(c,QOverload<int>::of(&QComboBox::currentIndexChanged),this,[this]{dirty_=true;emit edited();});
@@ -75,7 +80,7 @@ void AccountEditor::setAccount(const Account &a) {
     const QMap<QString,QString> strings{{"label",a.label},{"callerIdName",a.callerIdName},{"username",a.username},{"domain",a.domain},{"server",a.server},{"authUser",a.authUser},{"password",a.password},
         {"certificate",a.certificate},{"privateKey",a.privateKey},{"keyPassword",a.keyPassword},{"stunServer",a.stunServer},{"turnUser",a.turnUser},{"turnPassword",a.turnPassword},{"forwardTo",a.forwardTo}};
     for(auto it=strings.cbegin();it!=strings.cend();++it)text_[it.key()]->setText(it.value());
-    const QMap<QString,bool> values{{"enabled",a.enabled},{"autoAnswer",a.autoAnswer},{"ice",a.ice},{"turn",a.turn},{"webrtc",a.webrtc},{"forwardBusy",a.forwardBusy},{"rememberPassword",a.rememberPassword}};
+    const QMap<QString,bool> values{{"enabled",a.enabled},{"autoAnswer",a.autoAnswer},{"pagingEnabled",a.pagingEnabled},{"pagingMicMuted",a.pagingMicMuted},{"pagingBeep",a.pagingBeep},{"ice",a.ice},{"turn",a.turn},{"webrtc",a.webrtc},{"forwardBusy",a.forwardBusy},{"rememberPassword",a.rememberPassword}};
     for(auto it=values.cbegin();it!=values.cend();++it)check_[it.key()]->setChecked(it.value());
     transport_->setCurrentText(a.transport);encryption_->setCurrentIndex(encryption_->findData(a.encryption));expiry_->setValue(a.expires);dirty_=false;
 }
@@ -90,6 +95,7 @@ Account AccountEditor::account() const {
     Account a=original_;if(a.id.isEmpty())a.id=QUuid::createUuid().toString(QUuid::WithoutBraces);
     a.label=text_["label"]->text().trimmed();a.username=text_["username"]->text().trimmed();a.domain=text_["domain"]->text().trimmed();
     a.callerIdName=text_["callerIdName"]->text().trimmed();a.autoAnswer=check_["autoAnswer"]->isChecked();
+    a.pagingEnabled=check_["pagingEnabled"]->isChecked();a.pagingMicMuted=check_["pagingMicMuted"]->isChecked();a.pagingBeep=check_["pagingBeep"]->isChecked();
     a.server=text_["server"]->text().trimmed();a.authUser=text_["authUser"]->text().trimmed();a.password=text_["password"]->text();
     a.rememberPassword=check_["rememberPassword"]->isChecked();if(!a.password.isEmpty()||!a.rememberPassword)a.credentialsRequired=false;
     a.transport=transport_->currentText();a.encryption=encryption_->currentData().toString();a.expires=expiry_->value();

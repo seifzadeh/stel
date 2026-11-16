@@ -23,6 +23,7 @@ public:
     QList<QByteArray> inviteBodies;
     QList<QByteArray> sdpAnswers;
     bool bareRequestUri=true;
+    QList<QPair<QByteArray,QByteArray>> incomingInviteHeaders;
 private:
     struct Dialog {QString a,b,aId,bId;};
     struct Transaction {QHostAddress address;quint16 port;QByteArray id;QList<QByteArray> vias;};
@@ -111,6 +112,8 @@ private:
             auto target=destination.contact;
             if(bareRequestUri)target.replace(QRegularExpression("(?<=sip:)[^@]+@"),"");
             lines[0]=method+' '+target.toUtf8()+" SIP/2.0";
+            if(method=="INVITE"&&!header(lines,"to").contains(";tag="))
+                for(const auto &item:incomingInviteHeaders)lines=replace(lines,item.first.toLower(),item.second);
             lines=replace(lines,"route",{});lines=replace(lines,"via",("SIP/2.0/UDP 127.0.0.1:"+QString::number(this->port())+";branch="+branch).toUtf8());
             lines=replace(lines,"call-id",(fromA?dialog.bId:dialog.aId).toUtf8());
             if(!header(lines,"contact").isEmpty())lines=replace(lines,"contact",("<sip:"+(fromA?dialog.a:dialog.b)+"@127.0.0.1:"+QString::number(this->port())+">").toUtf8());

@@ -155,6 +155,11 @@ int main(int argc,char **argv){
         waitFor([&]{return callDialog(window,true);},"Main-screen incoming call did not open");
         child<QPushButton>(*callDialog(window,true),"callAnswer")->click();waitFor([&]{return running(*engine);},"Main-screen call did not connect");
         QTest::qWait(1200);capture(window,"main-window");hangup();
+        pbx.incomingInviteHeaders={{"Alert-Info","<sip:pbx@localhost>;info=alert-autoanswer;delay=0"}};
+        require(engine->dial(accounts[0].id,"1002",false),"Cannot place the demo page");
+        waitFor([&]{return running(*engine);},"Demo page did not auto-answer");
+        incoming=callDialog(window,true);require(incoming&&incoming->callInfo().pagingAutoAnswered&&incoming->callInfo().muted,"Paging microphone policy is missing");
+        incoming->resize(620,800);capture(*incoming,"paging-call");capture(window,"paging");hangup();pbx.incomingInviteHeaders.clear();
         child<QLineEdit>(window,"dialTarget")->clear();capture(window,"main-idle");
         pages->setCurrentIndex(3);capture(window,"contacts");
         pages->setCurrentIndex(4);capture(window,"history");
@@ -174,14 +179,14 @@ int main(int argc,char **argv){
         }
         settingsPages->setCurrentIndex(0);settings->resize(1080,900);
         auto *accountPages=child<QTabWidget>(*settings,"accountTabs");
-        for(const auto &entry:QList<QPair<int,QString>>{{1,"account-security"},{2,"account-nat"},{3,"account-forwarding"}}){
+        for(const auto &entry:QList<QPair<int,QString>>{{1,"account-security"},{2,"account-nat"},{3,"account-forwarding"},{4,"account-paging"}}){
             accountPages->setCurrentIndex(entry.first);capture(*settings,entry.second);
         }
         QJsonObject manifest{{"version",QString::fromLatin1(STEL_VERSION)},{"qt",QString::fromLatin1(qVersion())},
             {"liblinphone",QString::fromUtf8(linphone_core_get_version())},{"platform",QSysInfo::prettyProductName()},
             {"captured_at",QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},
             {"ui_source_commit",qEnvironmentVariable("STEL_SCREENSHOT_REVISION")},
-            {"fixture","Disposable loopback PBX, two registered demo accounts, dummy microphone and camera; real SIP messages and a two-page T.38 fax."},
+            {"fixture","Disposable loopback PBX, two registered demo accounts, dummy microphone and camera; real SIP messages, an Alert-Info page and a two-page T.38 fax."},
             {"images",images}};
         QFile metadata(output.filePath("capture.json"));require(metadata.open(QIODevice::WriteOnly),"Cannot write capture metadata");metadata.write(QJsonDocument(manifest).toJson());
         qInfo()<<"Screenshots captured from Stel"<<STEL_VERSION;return 0;

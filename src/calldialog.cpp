@@ -141,11 +141,11 @@ void CallDialog::updateCall(const CallInfo &info,const QString &accountDetails,c
     if(ended&&closeQuestion_)closeQuestion_->done(QMessageBox::No);
     const bool connected=state==LinphoneCallStreamsRunning,held=state==LinphoneCallPaused||state==LinphoneCallPausedByRemote,established=connected||held;
     const auto peer=info.remoteName.isEmpty()?(info.remoteUsername.isEmpty()?info.remote:info.remoteUsername):info.remoteName;
-    setWindowTitle((incoming?"Incoming call":info.incoming?"Call from":"Call to")+QString(" · ")+peer+" · Stel");
-    direction_->setText(info.incoming?"INCOMING CALL":"OUTGOING CALL");name_->setText(peer);address_->setText(info.remote);account_->setText("Account: "+accountDetails);
+    setWindowTitle((info.paging?"Page from":incoming?"Incoming call":info.incoming?"Call from":"Call to")+QString(" · ")+peer+" · Stel");
+    direction_->setText(info.paging?(info.pagingAutoAnswered?"PAGING / INTERCOM · AUTO ANSWERED":"INCOMING PAGE / INTERCOM"):info.incoming?"INCOMING CALL":"OUTGOING CALL");name_->setText(peer);address_->setText(info.remote);account_->setText("Account: "+accountDetails);
     duration_->setText(QString("%1:%2").arg(info.duration/60,2,10,QChar('0')).arg(info.duration%60,2,10,QChar('0')));
     status_->setText(!ended&&info.inConference?"Conference · "+QString::number(info.conferenceParticipants)+" participants":callStateLabel(state));status_->setStyleSheet("font-weight:600;color:"+QString(state==LinphoneCallError?"#b33748":connected?"#087f74":incoming?"#a16a16":"#526b7c")+";");
-    answer_->setVisible(incoming);answerVideo_->setVisible(incoming&&info.video);hangup_->setText(incoming?"Reject":established?"Hang up":ended?"Call ended":"Cancel call");hangup_->setEnabled(!ended);
+    answer_->setVisible(incoming);answerVideo_->setVisible(incoming&&info.video&&!info.paging);hangup_->setText(incoming?"Reject":established?"Hang up":ended?"Call ended":"Cancel call");hangup_->setEnabled(!ended);
     ringTransfer_->setVisible(incoming);if(justAnswered)mediaTabs_->setCurrentIndex(0);
     fax_->setVisible(info.incoming&&!ended);fax_->setEnabled(incoming||connected||state==LinphoneCallUpdatedByRemote);
     hold_->setEnabled(established&&!info.inConference);hold_->setText(state==LinphoneCallPaused?"Resume":"Hold");
@@ -155,6 +155,7 @@ void CallDialog::updateCall(const CallInfo &info,const QString &accountDetails,c
     mediaTabs_->setTabEnabled(1,info.video&&!ended);if(info.video&&!videoBound_)bindVideo();
     if(info.video&&connected&&!videoOpened_){videoOpened_=true;mediaTabs_->setCurrentIndex(1);}
     mediaDetails_->setText("Remote address: "+info.remote+"\nLocal account: "+accountDetails+"\nSignalling: "+(transport.isEmpty()?QString("—"):transport.toUpper())+"\nMedia security: "+mediaEncryption(info.encryption)+"\nAudio codec: "+(info.audioCodec.isEmpty()?QString("Negotiating"):info.audioCodec)+"\nVideo codec: "+(info.videoCodec.isEmpty()?QString("—"):info.videoCodec));
+    if(info.paging)mediaDetails_->setText(mediaDetails_->text()+"\nSIP paging: "+info.pagingHeader+(info.pagingAutoAnswered?" · automatically answered":" · manual answer")+"\nMicrophone: "+(info.muted?"muted":"enabled"));
     if(routePanel_->isVisible()){const bool canRoute=routeAction_==RouteAction::Forward?incoming:(incoming||established);routeApply_->setEnabled(canRoute);routeHint_->setText(incoming?"Send this ringing call to another destination without answering.":"Transfer this connected call to another destination.");}
     refreshPeers(peers_);
     if(!faxInfo_.id.isEmpty()&&!ended&&!(incoming&&faxInfo_.state=="failed")){

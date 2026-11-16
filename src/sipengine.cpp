@@ -68,7 +68,7 @@ void SipEngine::shutdown() {
         }
         linphone_core_stop(core_);
         for(auto *c:calls_)linphone_call_unref(c);
-        calls_.clear(); callIds_.clear();localPeerCalls_.clear();
+        calls_.clear(); callIds_.clear();localPeerCalls_.clear();pagingRequests_.clear();pagingAnswered_.clear();
         for(const auto &h:accounts_) {
             linphone_account_unref(h.account);
             if(h.auth)linphone_auth_info_unref(h.auth);
@@ -410,7 +410,8 @@ SipEngine *SipEngine::owner(const QString &id) {
 bool SipEngine::answer(const QString &id,bool video) {
     if(auto *e=owner(id);e && e!=this)return e->answer(id,video);
     auto *c=call(id); if(!c)return fail("Call no longer exists.");
-    const auto policy=accounts_.value(accountId(c)).config.encryption;
+    const auto account=accounts_.value(accountId(c)).config;
+    const auto policy=account.encryption;
     const auto *offered=linphone_call_get_remote_params(c);
     if(offered&&linphone_call_params_get_custom_sdp_attribute(offered,"x-stel-remote-t38-port"))return fail("This is a T.38 fax call. Use the Fax button to receive it.");
     // SDES can be checked before answering; DTLS is established by its later
@@ -436,10 +437,75 @@ bool SipEngine::answer(const QString &id,bool video) {
         localPeerCalls_.insert(c);localPeerCalls_.insert(peer);
         linphone_core_set_media_resource_mode(core_,LinphoneSharedMediaResources);
     } else linphone_core_set_media_resource_mode(core_,LinphoneExclusiveMediaResources);
+    if(pagingRequests_.contains(c)&&account.pagingEnabled) {
+        video=false;
+        // Set mute before streams start, rather than opening the microphone
+        // for a moment and muting it in a later Connected callback.
+        linphone_call_set_microphone_muted(c,account.pagingMicMuted);
+        routePagingSpeaker(c);
+    }
     auto *params=linphone_core_create_call_params(core_,c); configureCall(params,accountId(c),video);
     const int ret=linphone_call_accept_with_params(c,params); linphone_call_params_unref(params);
     if(ret!=0){localPeerCalls_=oldPeers;linphone_core_set_media_resource_mode(core_,oldMode);}
     return status(ret,"Answer");
+}
+void SipEngine::routePagingSpeaker(LinphoneCall *call) {
+    if(preferences_.outputDevice==dummySpeaker())return;
+    auto *devices=linphone_core_get_extended_audio_devices(core_);bool selected=false;
+    for(auto *node=devices;node;node=node->next) {
+        auto *device=static_cast<LinphoneAudioDevice*>(node->data);
+        if(!selected&&linphone_audio_device_get_type(device)==LinphoneAudioDeviceTypeSpeaker&&
+           linphone_audio_device_has_capability(device,LinphoneAudioDeviceCapabilityPlay)) {
+            linphone_call_set_output_audio_device(call,device);selected=true;
+        }
+        linphone_audio_device_unref(device);
+    }
+    bctbx_list_free(devices);
+}
+bool SipEngine::pagingBusy(const QString &id,const Account &account) const {
+    const auto *root=this;
+    while(auto *parent=qobject_cast<SipEngine*>(root->parent()))root=parent;
+    for(const auto &other:root->calls()) {
+        if(other.id==id||other.rawState==LinphoneCallEnd||other.rawState==LinphoneCallError||other.rawState==LinphoneCallReleased)continue;
+        // A local caller and the incoming leg through a PBX are one call, not
+        // a busy phone. This is also how the normal Answer path treats them.
+        const bool outgoingOffer=other.rawState==LinphoneCallOutgoingInit||other.rawState==LinphoneCallOutgoingProgress||
+            other.rawState==LinphoneCallOutgoingRinging||other.rawState==LinphoneCallOutgoingEarlyMedia;
+        if(!other.incoming&&other.accountId!=account.id&&outgoingOffer) {
+            auto *remote=linphone_factory_create_address(linphone_factory_get(),other.remote.toUtf8().constData());
+            const bool peer=remote&&str(linphone_address_get_username(remote))==account.username&&
+                str(linphone_address_get_domain(remote)).compare(account.domain,Qt::CaseInsensitive)==0;
+            if(remote)linphone_address_unref(remote);
+            if(peer)continue;
+        }
+        return true;
+    }
+    return false;
+}
+void SipEngine::applyIncomingPolicy(const QString &id,bool pagingAlerted) {
+    if(stopping_)return;
+    auto *pending=call(id);if(!pending||linphone_call_get_state(pending)!=LinphoneCallIncomingReceived)return;
+    const auto account=accountId(pending);const auto config=accounts_.value(account).config;
+    bool busy=false;
+    for(auto *other:calls_)if(other!=pending) {
+        const auto state=linphone_call_get_state(other);
+        busy|=state!=LinphoneCallEnd&&state!=LinphoneCallError&&state!=LinphoneCallReleased;
+    }
+    if(!config.forwardTo.isEmpty()&&(!config.forwardBusy||busy||dnd_)){redirect(id,config.forwardTo);return;}
+    if(dnd_){linphone_call_decline(pending,LinphoneReasonBusy);return;}
+    if(!accounts_.contains(account)||!config.enabled)return;
+    if(pagingRequests_.contains(pending)&&config.pagingEnabled) {
+        if(pagingBusy(id,config)) {
+            emit notification("Incoming page is waiting; another call is active.");return;
+        }
+        linphone_core_stop_ringing(core_);
+        if(config.pagingBeep&&!pagingAlerted) {
+            linphone_core_play_dtmf(core_,'5',140);
+            QTimer::singleShot(180,this,[this,id]{applyIncomingPolicy(id,true);});return;
+        }
+        pagingAnswered_.insert(pending);
+        if(!answer(id,false))pagingAnswered_.remove(pending);
+    } else if(config.autoAnswer)answer(id,false);
 }
 bool SipEngine::hangup(const QString &id) {
     if(auto *e=owner(id);e && e!=this)return e->hangup(id);
@@ -765,6 +831,7 @@ CallInfo SipEngine::info(LinphoneCall *c) const {
     CallInfo i; i.id=callIds_.value(c); i.accountId=accountId(c); i.rawState=linphone_call_get_state(c);
     const auto &account=accounts_.value(i.accountId).config;i.accountName=account.label.isEmpty()?account.username:account.label;
     i.state=str(linphone_call_state_to_string(i.rawState)); i.incoming=linphone_call_get_dir(c)==LinphoneCallIncoming;
+    i.paging=pagingRequests_.contains(c);i.pagingHeader=pagingRequests_.value(c).headerName;i.pagingAutoAnswered=pagingAnswered_.contains(c);
     char *uri=linphone_address_as_string_uri_only(linphone_call_get_remote_address(c)); i.remote=str(uri); bctbx_free(uri);
     const auto *address=linphone_call_get_remote_address(c);i.remoteName=str(linphone_address_get_display_name(address));i.remoteUsername=str(linphone_address_get_username(address));
     i.duration=linphone_call_get_duration(c);
@@ -811,28 +878,21 @@ void SipEngine::callCb(LinphoneCore *lc,LinphoneCall *c,LinphoneCallState state,
         const auto id=QUuid::createUuid().toString(QUuid::WithoutBraces);
         self->callIds_.insert(c,id); self->calls_.insert(id,linphone_call_ref(c));
     }
+    if(state==LinphoneCallIncomingReceived) {
+        const auto *params=linphone_call_get_remote_params(c);
+        const auto request=params?pagingRequest(str(linphone_call_params_get_custom_header(params,"Alert-Info")),
+            str(linphone_call_params_get_custom_header(params,"Call-Info"))):PagingRequest{};
+        if(request.requested)self->pagingRequests_.insert(c,request);
+    }
     auto i=self->info(c); i.message=str(message);
     self->faxCallState(c,state);
     if(!self->stopping_)emit self->callChanged(i);
     // Post decisions outside the callback to avoid nested call-state notifications.
-    if(state==LinphoneCallIncomingReceived && !self->stopping_)QTimer::singleShot(0,self,[self,id=i.id]{
-        if(self->stopping_)return;
-        auto *pending=self->call(id);if(!pending||linphone_call_get_state(pending)!=LinphoneCallIncomingReceived)return;
-        const auto accountId=self->accountId(pending);const auto a=self->accounts_.value(accountId).config;
-        bool busy=false;
-        for(auto *other:self->calls_)if(other!=pending) {
-            const auto s=linphone_call_get_state(other);
-            busy|=s!=LinphoneCallEnd && s!=LinphoneCallError && s!=LinphoneCallReleased;
-        }
-        const bool reject=self->dnd_;
-        if(!a.forwardTo.isEmpty() && (!a.forwardBusy||busy||reject))
-            self->redirect(id,a.forwardTo);
-        else if(reject)linphone_call_decline(pending,LinphoneReasonBusy);
-        else if(self->accounts_.contains(accountId)&&a.enabled&&a.autoAnswer)self->answer(id,false);
-    });
+    if(state==LinphoneCallIncomingReceived && !self->stopping_)QTimer::singleShot(0,self,[self,id=i.id]{self->applyIncomingPolicy(id);});
     if(state==LinphoneCallReleased) {
         if(!self->stopping_)emit self->callFinished(i);
         self->calls_.remove(i.id); self->callIds_.remove(c);
+        self->pagingRequests_.remove(c);self->pagingAnswered_.remove(c);
         if(self->localPeerCalls_.remove(c)&&self->localPeerCalls_.isEmpty())linphone_core_set_media_resource_mode(lc,LinphoneExclusiveMediaResources);
         linphone_call_unref(c);
     }

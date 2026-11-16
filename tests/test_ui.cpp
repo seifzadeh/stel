@@ -429,6 +429,19 @@ private slots:
         for(const auto &i:a.calls())a.hangup(i.id);
         QTRY_VERIFY_WITH_TIMEOUT(a.calls().isEmpty()&&e->calls().isEmpty(),6000);
     }
+    void incomingPagingAndAccountOptions(){
+        QTemporaryDir tmp;MiniPbx pbx;pbx.incomingInviteHeaders={{"Alert-Info","<sip:pbx@localhost>;info=alert-autoanswer;delay=0"}};
+        stel::Preferences prefs;prefs.inputDevice=stel::dummyMicTone();prefs.outputDevice=stel::dummySpeaker();prefs.videoDevice=stel::dummyCamera();
+        auto bob=direct("bob");bob.server=pbx.server();bob.registerEnabled=true;bob.password="paging-ui-local-only";stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({bob},prefs));
+        stel::MainWindow window(store.directory());window.show();auto *engine=window.findChild<stel::SipEngine*>();IsolatedSipEngine caller;QVERIFY(caller.start(prefs,tmp.path()+"/caller",true));auto alice=direct("alice");alice.server=pbx.server();alice.registerEnabled=true;QVERIFY(caller.addAccount(alice));
+        QTRY_VERIFY_WITH_TIMEOUT(pbx.registered("alice")&&pbx.registered("bob"),6000);QVERIFY(caller.dial("alice","bob",true));QTRY_VERIFY_WITH_TIMEOUT(streams(caller)&&streams(*engine),8000);
+        auto *page=dialog(window,true);QVERIFY(page);QVERIFY(page->callInfo().pagingAutoAnswered);QVERIFY(page->callInfo().muted);QVERIFY(!page->callInfo().video);QVERIFY(page->findChild<QLabel*>("callDirection")->text().contains("PAGING"));QVERIFY(button(*page,"callMute")->isChecked());QVERIFY(!button(*page,"callAnswerVideo")->isVisible());captureCall(*page,"incoming-page");
+        button(*page,"callHangup")->click();QTRY_VERIFY_WITH_TIMEOUT(engine->calls().isEmpty()&&caller.calls().isEmpty(),6000);
+        window.showSettings();auto *settings=window.findChild<stel::SettingsWidget*>();auto *tabs=settings->findChild<QTabWidget*>("accountTabs");QCOMPARE(tabs->tabText(4),QString("Paging"));tabs->setCurrentIndex(4);
+        auto *enabled=settings->findChild<QCheckBox*>("pagingEnabled"),*muted=settings->findChild<QCheckBox*>("pagingMicMuted"),*beep=settings->findChild<QCheckBox*>("pagingBeep");QVERIFY(enabled&&muted&&beep);QVERIFY(enabled->isChecked());QVERIFY(muted->isChecked());QVERIFY(beep->isChecked());screenshot(window,"paging-settings");
+        enabled->setChecked(false);muted->setChecked(false);beep->setChecked(false);button(*settings,"saveAccount")->click();QVector<stel::Account> saved;stel::Preferences loaded;QVERIFY(store.load(saved,loaded));QCOMPARE(saved.size(),1);QVERIFY(!saved[0].pagingEnabled);QVERIFY(!saved[0].pagingMicMuted);QVERIFY(!saved[0].pagingBeep);QVERIFY(!saved[0].autoAnswer);
+        QVERIFY(store.save({},prefs));
+    }
     void mediaTypeCanBeSelectedAndSaved() {
         QTemporaryDir tmp;stel::MainWindow w(tmp.path());QVERIFY(w.ready());w.show();w.showSettings();auto *settings=w.findChild<stel::SettingsWidget*>();button(*settings,"addAccount")->click();
         auto *editor=settings->findChild<stel::AccountEditor*>();auto *media=editor->findChild<QComboBox*>("encryption");QVERIFY(media->isVisible());QCOMPARE(media->currentText(),QString("RTP"));QCOMPARE(media->currentData().toString(),QString("none"));

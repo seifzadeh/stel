@@ -89,7 +89,7 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
         const auto old=callCache_.take(i.id);
         if(auto dialog=callDialogs_.value(i.id))dialog->finishCall(old.id.isEmpty()?i:old);
         store_.appendHistory({{"at",QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},{"remote",i.remote},{"account",i.accountId},
-            {"incoming",i.incoming},{"duration",qMax(i.duration,old.duration)},{"state",old.state},{"video",old.video}});
+            {"incoming",i.incoming},{"paging",i.paging},{"pagingAutoAnswered",i.pagingAutoAnswered},{"duration",qMax(i.duration,old.duration)},{"state",old.state},{"video",old.video}});
         for(int row=0;row<calls_->count();++row)if(calls_->item(row)->data(Qt::UserRole).toString()==i.id){delete calls_->takeItem(row);break;}
         refreshHistory();updateControls();refreshCallDialogs();
     });
@@ -209,7 +209,7 @@ void MainWindow::updateCall(const CallInfo &i){
     QString localAccount=i.accountName,accountDetails=i.accountName,transport;
     for(const auto &a:accounts_)if(a.id==i.accountId){localAccount=a.label.isEmpty()?a.username:a.label;accountDetails=localAccount+" · "+a.username+"@"+a.domain;transport=a.transport;break;}
     item->setData(Qt::UserRole+1,i.accountId);item->setData(Qt::UserRole+2,i.incoming);item->setData(Qt::UserRole+3,int(i.rawState));
-    item->setText("Line "+QString::number(calls_->row(item)+1)+"\n"+(i.rawState==LinphoneCallStreamsRunning?QString("In Call"):callStateLabel(i.rawState))+" – "+QTime(0,0).addSecs(i.duration).toString("hh:mm:ss"));
+    item->setText("Line "+QString::number(calls_->row(item)+1)+"\n"+(i.rawState==LinphoneCallStreamsRunning?(i.paging?QString("Paging"):QString("In Call")):callStateLabel(i.rawState))+" – "+QTime(0,0).addSecs(i.duration).toString("hh:mm:ss"));
     item->setToolTip(localAccount+"\n"+i.remote);
     if(first || old.rawState!=i.rawState)appendLog(i.remote+"  "+i.state+"  "+i.message);
     auto dialog=callDialogs_.value(i.id);
@@ -223,7 +223,7 @@ void MainWindow::updateCall(const CallInfo &i){
         const auto screen=QApplication::primaryScreen();if(screen){const auto area=screen->availableGeometry();const int offset=24*((callDialogs_.size()-1)%5);dialog->move(qBound(area.left(),frameGeometry().center().x()-dialog->width()/2+offset,area.right()-dialog->width()),qBound(area.top(),area.center().y()-dialog->height()/2+offset,area.bottom()-dialog->height()));}
     }
     if(dialog){dialog->updateCall(i,accountDetails,transport);if(first)showCall(i.id);}
-    if(first && i.incoming){QApplication::alert(dialog?static_cast<QWidget*>(dialog):this);if(tray_)tray_->showMessage("Incoming call",i.remote,QSystemTrayIcon::Information,10000);QApplication::beep();}
+    if(first && i.incoming){QApplication::alert(dialog?static_cast<QWidget*>(dialog):this);if(tray_)tray_->showMessage(i.paging?"Incoming page":"Incoming call",i.remote,QSystemTrayIcon::Information,10000);if(!i.paging)QApplication::beep();}
     updateControls();refreshCallDialogs();
 }
 void MainWindow::updateControls(){
@@ -241,5 +241,5 @@ void MainWindow::updateControls(){
 
 }
 void MainWindow::refreshContacts(){contacts_->clear();for(const auto &o:store_.contacts()){auto *item=new QListWidgetItem(o["name"].toString()+"\n"+o["uri"].toString(),contacts_);item->setData(Qt::UserRole,o["uri"].toString());}}
-void MainWindow::refreshHistory(){history_->clear();for(const auto &o:store_.history()){const auto date=QDateTime::fromString(o["at"].toString(),Qt::ISODate).toLocalTime();auto *item=new QListWidgetItem((o["incoming"].toBool()?"↙  ":"↗  ")+o["remote"].toString()+"\n"+date.toString("yyyy-MM-dd HH:mm")+"  ·  "+QString::number(o["duration"].toInt())+"s",history_);item->setData(Qt::UserRole,o["remote"].toString());}}
+void MainWindow::refreshHistory(){history_->clear();for(const auto &o:store_.history()){const auto date=QDateTime::fromString(o["at"].toString(),Qt::ISODate).toLocalTime();auto *item=new QListWidgetItem((o["paging"].toBool()?QString("Page  ·  "):(o["incoming"].toBool()?QString("↙  "):QString("↗  ")))+o["remote"].toString()+"\n"+date.toString("yyyy-MM-dd HH:mm")+"  ·  "+QString::number(o["duration"].toInt())+"s",history_);item->setData(Qt::UserRole,o["remote"].toString());}}
 }
