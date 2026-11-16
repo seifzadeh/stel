@@ -1,0 +1,38 @@
+# The application is already audited and compressed inside its native launcher.
+# RPM's normal ELF stripping would destroy the appended application payload.
+%global __os_install_post %{nil}
+%global debug_package %{nil}
+%global _build_id_links none
+%global _binary_payload w1.gzdio
+Name: stel
+Version: @VERSION@
+Release: 1
+Summary: Multi-account SIP softphone with voice, video, chat and fax
+License: GPL-3.0-or-later AND AGPL-3.0-or-later
+URL: https://github.com/seifzadeh/stel
+Source0: payload.tar
+BuildArch: x86_64
+AutoReqProv: no
+Requires: glibc >= @GLIBC@
+Recommends: gnome-keyring
+
+%description
+Stel is a Qt/C++ softphone based on liblinphone. Application libraries are
+included. Accounts and history are stored in the user's profile.
+
+%prep
+
+%build
+
+%install
+mkdir -p "%{buildroot}"
+tar -xf "%{SOURCE0}" -C "%{buildroot}"
+
+%files
+%dir /opt/stel
+/opt/stel/stel
+/usr/bin/stel
+/usr/share/applications/stel.desktop
+/usr/share/icons/hicolor/*/apps/stel.*
+%doc /usr/share/doc/stel
+%license /usr/share/licenses/stel

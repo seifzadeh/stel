@@ -56,7 +56,7 @@
 
 ## شروع کار
 
-1. فایل `.exe` ویندوز یا `.run` لینوکس را از [Releases](https://github.com/seifzadeh/stel/releases) بگیر. کتابخانه‌های لازم همراه برنامه هستند. در لینوکس، اجازهٔ اجرا را برای فایل فعال کن.
+1. از [Releases](https://github.com/seifzadeh/stel/releases)، فایل **Setup.exe** ویندوز یا **deb / rpm** لینوکس را بگیر و نصب کن. نسخه‌های قابل حمل exe و run هم موجودند و کتابخانه‌ها همراه برنامه هستند. [راهنمای نصب](docs/INSTALLING.md)
 
 2. به **Settings → Accounts → Add account** برو، اطلاعات SIP را وارد کن و **Register** بزن. وضعیت سبز یعنی اکانت رجیستر شده است.
 

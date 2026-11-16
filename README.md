@@ -57,7 +57,7 @@ Messaging, fax and call transfers need support from your PBX and the other endpo
 
 ## Get started
 
-1. Download the Windows `.exe` or Linux `.run` from [Releases](https://github.com/seifzadeh/stel/releases). Application libraries are included. On Linux, allow the file to run as a program.
+1. Download the Windows **Setup.exe**, Linux **.deb** or **.rpm** from [Releases](https://github.com/seifzadeh/stel/releases) and install it. Portable `.exe` and `.run` downloads are also available. Application libraries are included. See the [installation guide](docs/INSTALLING.md).
 2. Open **Settings → Accounts → Add account**, enter your SIP details and press **Register**. A green status shows a successful registration.
 3. Use **Phone**, **Messages** or **Fax** and choose the account you want to use.
 

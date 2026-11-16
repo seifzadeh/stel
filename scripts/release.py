@@ -11,7 +11,7 @@ import tarfile
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_PATTERN = r'project\(Stel VERSION (\d+\.\d+\.\d+) LANGUAGES'
 SOURCE_PATHS = ('CMakeLists.txt', '.gitignore', '.gitattributes', '.github', 'cmake', 'src',
-                'tests', 'scripts', 'docs', 'website', 'packaging', 'third_party',
+                'tests', 'scripts', 'docs', 'website', 'assets', 'packaging', 'third_party',
                 'README.md', 'README.fa.md', 'LICENSE', 'LICENSES', 'NOTICE.md',
                 'THIRD_PARTY.md', 'CHANGELOG.md', 'CONTRIBUTING.md')
 
@@ -21,6 +21,27 @@ def version(root=ROOT):
     if not match:
         raise ValueError('CMakeLists.txt must contain a three-part Stel version')
     return match[1]
+
+
+def platform_assets(platform, v=None):
+    v = v or version()
+    if platform == 'linux':
+        return {'Stel-linux-x86_64.run': f'Stel-{v}-linux-x86_64.run',
+                'Stel-linux-x86_64.tar.gz': f'Stel-{v}-linux-x86_64.tar.gz',
+                f'stel_{v}_amd64.deb': f'Stel-{v}-linux-x86_64.deb',
+                f'stel-{v}-1.x86_64.rpm': f'Stel-{v}-linux-x86_64.rpm',
+                'Stel-dependencies-linux-sources.tar.gz': f'Stel-{v}-dependencies-linux-sources.tar.gz'}
+    if platform == 'windows':
+        return {'Stel-portable-windows-x64.exe': f'Stel-{v}-windows-x64.exe',
+                'Stel-setup-windows-x64.exe': f'Stel-{v}-windows-x64-setup.exe',
+                'Stel-windows-x64.zip': f'Stel-{v}-windows-x64.zip',
+                'Stel-dependencies-windows-sources.tar.gz': f'Stel-{v}-dependencies-windows-sources.tar.gz'}
+    raise ValueError('Unknown platform')
+
+
+def required_assets(v=None):
+    v = v or version()
+    return set(platform_assets('linux', v).values()) | set(platform_assets('windows', v).values()) | {f'Stel-source-{v}.tar.gz'}
 
 
 def source_archive(output, root=ROOT):
@@ -96,10 +117,11 @@ def main():
         if not match:
             parser.error('Add a CHANGELOG entry for this version')
         args.output.write_text(f'# Stel {version()}\n\n' + match[1].strip() + '\n\n'
-                              'Download the native `.run` (Linux) or portable `.exe` (Windows); no shell launcher is required. '
-                              'Archives include runtime dependencies and notices. SHA256SUMS verifies all assets. '
+                              'Install with the Windows `-setup.exe`, Linux `.deb` or `.rpm`. '
+                              'Portable `.run` (Linux) and `.exe` (Windows) are also available; no shell launcher is required. '
+                              'Application libraries and notices are included. SHA256SUMS verifies all assets. '
                               'Source archives include matching application and dependency sources. '
-                              'See BUILDING.md and RELEASE.md in the source archive for platform baselines.\n')
+                              'See docs/INSTALLING.md, docs/BUILDING.md and docs/RELEASE.md in the source archive for installation and platform baselines.\n')
 
 
 if __name__ == '__main__':

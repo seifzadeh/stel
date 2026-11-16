@@ -63,8 +63,17 @@ jobs:
         run: |
           python3 scripts/package-linux.py
           python3 scripts/ci/smoke-portable.py dist/Stel-linux-x86_64.run
+          python3 scripts/package-installers.py linux
+          python3 scripts/ci/check-linux-packages.py
+          python3 scripts/ci/smoke-linux-install.py deb "dist/stel_${{ needs.metadata.outputs.version }}_amd64.deb"
           python3 scripts/ci/linux-sources.py dist/Stel-linux-x86_64 --output dist
           python3 scripts/ci/stage-assets.py linux
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rpm-test-package
+          path: dist/stel-*.rpm
+          compression-level: 0
+          if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux
@@ -152,6 +161,14 @@ jobs:
           path: C:/stel-deps
           key: ${{ steps.dependencies.outputs.cache-primary-key }}
       - run: ./scripts/ci/windows-build.ps1
+      - name: Build and test the Windows installer
+        run: |
+          choco upgrade nsis --version=3.11.0 --allow-downgrade -y --no-progress
+          if ($LASTEXITCODE) { throw 'NSIS installation failed' }
+          $Nsis = Join-Path ${env:ProgramFiles(x86)} 'NSIS/makensis.exe'
+          python scripts/package-installers.py windows --makensis $Nsis
+          if ($LASTEXITCODE) { throw 'Windows installer creation failed' }
+          ./scripts/ci/smoke-windows-installer.ps1
       - run: |
           python scripts/ci/windows-sources.py
           if ($LASTEXITCODE) { throw 'Source collection failed' }
@@ -171,8 +188,25 @@ jobs:
             build-windows/Testing/Temporary/*.log
             build-windows/Testing/Temporary/*-qt.txt
 
+  rpm-install:
+    needs: [metadata, linux]
+    runs-on: ubuntu-24.04
+    container: fedora:44
+    timeout-minutes: 20
+    steps:
+      - run: dnf install -y git python3 desktop-file-utils
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: rpm-test-package
+          path: dist
+      - name: Install, launch, reinstall and remove on Fedora
+        run: python3 scripts/ci/smoke-linux-install.py rpm "dist/stel-${{ needs.metadata.outputs.version }}-1.x86_64.rpm"
+
   release:
-    needs: [metadata, linux, windows]
+    needs: [metadata, linux, windows, rpm-install]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-24.04
     permissions:

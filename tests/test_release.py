@@ -8,12 +8,16 @@ import tarfile
 import tempfile
 import unittest
 from unittest import mock
+import json
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('stel_release', ROOT / 'scripts/release.py')
 release = importlib.util.module_from_spec(spec);spec.loader.exec_module(release)
 spec = importlib.util.spec_from_file_location('stel_archives', ROOT / 'scripts/ci/fetch-source-archives.py')
 archives = importlib.util.module_from_spec(spec);spec.loader.exec_module(archives)
+sys.path.insert(0, str(ROOT / 'scripts'))
+spec = importlib.util.spec_from_file_location('stel_installers', ROOT / 'scripts/package-installers.py')
+installers = importlib.util.module_from_spec(spec);spec.loader.exec_module(installers)
 
 
 class ReleaseTests(unittest.TestCase):
@@ -44,7 +48,7 @@ class ReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / 'CMakeLists.txt').write_text('project(Stel VERSION 1.2.3 LANGUAGES C CXX)')
-            for file in ('src/main.cpp', 'src/messages.json', 'src/settings.json', 'cmake/StelLinphoneSdk.cmake', 'src/private.key', 'src/.secrets/pbx.env',
+            for file in ('src/main.cpp', 'assets/desk/chassis.png', 'src/messages.json', 'src/settings.json', 'cmake/StelLinphoneSdk.cmake', 'src/private.key', 'src/.secrets/pbx.env',
                          'tests/__pycache__/cached.pyc', '.secrets/pbx.env', 'build/stel',
                          '.github/workflows/build.yml', 'website/index.html', 'LICENSES/AGPL-3.0.txt'):
                 p = root / file;p.parent.mkdir(parents=True, exist_ok=True);p.write_text('fixture')
@@ -52,6 +56,7 @@ class ReleaseTests(unittest.TestCase):
             with tarfile.open(archive) as tar:
                 names = set(tar.getnames())
             self.assertIn('Stel-1.2.3/src/main.cpp', names)
+            self.assertIn('Stel-1.2.3/assets/desk/chassis.png', names)
             self.assertIn('Stel-1.2.3/cmake/StelLinphoneSdk.cmake', names)
             self.assertIn('Stel-1.2.3/.github/workflows/build.yml', names)
             self.assertFalse(any('.secrets' in n or 'private.key' in n or '__pycache__' in n or '/build/' in n for n in names))
@@ -69,6 +74,30 @@ class ReleaseTests(unittest.TestCase):
             release.checksums(path)
             self.assertEqual((path / 'SHA256SUMS').read_text(),
                              hashlib.sha256(b'native test payload').hexdigest() + '  binary.exe\n')
+
+    def test_release_contract_requires_all_installers(self):
+        required = release.required_assets('1.2.3')
+        self.assertIn('Stel-1.2.3-linux-x86_64.deb', required)
+        self.assertIn('Stel-1.2.3-linux-x86_64.rpm', required)
+        self.assertIn('Stel-1.2.3-windows-x64-setup.exe', required)
+        self.assertIn('Stel-1.2.3-windows-x64.exe', required)
+        self.assertEqual(len(required), 10)
+
+    def test_installers_reject_mismatched_binary_and_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp);payload = root / 'Stel.exe';payload.write_bytes(b'MZfixture')
+            manifest = root / 'bundle.json'
+            manifest.write_text(json.dumps({'version':'1.2.2','architecture':'x64'}))
+            with mock.patch.object(installers.subprocess, 'check_output') as execute:
+                with self.assertRaises(ValueError):installers.validate_payload(payload,manifest,'1.2.3','windows')
+                execute.assert_not_called()
+            manifest.write_text(json.dumps({'version':'1.2.3','architecture':'x64'}))
+            with mock.patch.object(installers.subprocess, 'check_output', return_value='Stel 1.2.2\n'):
+                with self.assertRaises(ValueError):installers.validate_payload(payload,manifest,'1.2.3','windows')
+            payload.write_bytes(b'\x7fELFfixture')
+            with mock.patch.object(installers.subprocess, 'check_output') as execute:
+                with self.assertRaises(ValueError):installers.validate_payload(payload,manifest,'1.2.3','windows')
+                execute.assert_not_called()
 
     def test_local_publisher_refuses_without_github_access(self):
         import os

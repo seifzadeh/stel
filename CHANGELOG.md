@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.0 — 2026-11-16
+
+- Add a Windows setup wizard with per-user installation, Start-menu and optional
+  desktop shortcuts, upgrades and an uninstaller that preserves user data.
+- Add Debian/Ubuntu .deb and RPM installers with desktop integration. Both
+  install the audited portable binary and declare its minimum glibc version.
+- Build all installers in the existing release workflow. Gate publication on
+  Debian, Fedora and Windows install/reinstall/launch/uninstall checks.
+- Keep portable downloads and dependency sources, checksum all new assets and
+  include chassis artwork in the corresponding source archive.
+
 ## 0.11.0 — 2026-11-16
 
 - Receive SIP paging and intercom through Yealink-compatible Alert-Info and

@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from release import version, checksums
+from release import version, checksums, required_assets
 
 if os.environ.get('GITHUB_ACTIONS') != 'true':
     raise SystemExit('Publication is only available in GitHub Actions; local preparation never publishes')
@@ -31,10 +31,7 @@ if existing and not existing['draft']:
 if existing and existing['target_commitish'] != commit:
     raise SystemExit('An unfinished draft exists for another commit; review it before retrying')
 assets = Path('release-assets')
-required = {f'Stel-{version()}-linux-x86_64.run', f'Stel-{version()}-linux-x86_64.tar.gz',
-            f'Stel-{version()}-windows-x64.exe', f'Stel-{version()}-windows-x64.zip',
-            f'Stel-source-{version()}.tar.gz', f'Stel-{version()}-dependencies-linux-sources.tar.gz',
-            f'Stel-{version()}-dependencies-windows-sources.tar.gz'}
+required = required_assets()
 if not required.issubset({p.name for p in assets.iterdir() if p.is_file()}):
     raise SystemExit('Missing required platform/source assets; refusing an incomplete release')
 # A manually supplied tag must reference this exact source commit.

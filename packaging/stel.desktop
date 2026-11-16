@@ -1,9 +1,11 @@
 [Desktop Entry]
 Type=Application
 Name=Stel
-Comment=Multi-account SIP softphone
+Comment=Calls, messages and fax
+Comment[fa]=تماس، پیام و فکس
 Exec=stel
+TryExec=stel
 Icon=stel
-Categories=Network;Telephony;
 Terminal=false
 StartupWMClass=stel
+Categories=Network;Telephony;

@@ -22,13 +22,13 @@ workflow run or repository-setting change was made during local preparation.
    cd /home/dev/codes/stel/repo
    git status --short
    git add .
-   git commit -m "Prepare Stel 0.6.0 and automated releases"
+   git commit -m "Release Stel 0.12.0"
    git push origin main
    ```
 
 The **Build, test and release** workflow starts automatically. It builds/tests
-Linux and Windows and checks the standalone applications. Only when both jobs
-succeed does it create the `v0.6.0` tag and GitHub Release for that commit. A draft
+Linux and Windows and checks the standalone applications. Only when Linux, Windows and RPM installation tests
+succeed does it create the `v0.12.0` tag and GitHub Release for that commit. A draft
 is used while uploading; it is published after all assets upload successfully.
 The **Website** workflow publishes the static site to GitHub Pages separately.
 The first SDK build on Windows takes longer; later runs reuse pinned dependency
@@ -37,10 +37,10 @@ caches. Workflow logs are the authority on the first Windows build's outcome.
 ## Next versions
 
 ```sh
-python3 scripts/release.py bump 0.6.1
-# Add a "## 0.6.1" section to CHANGELOG.md and describe the changes.
+python3 scripts/release.py bump 0.12.1
+# Add a "## 0.12.1" section to CHANGELOG.md and describe the changes.
 git add .
-git commit -m "Release Stel 0.6.1"
+git commit -m "Release Stel 0.12.1"
 git push origin main
 ```
 
@@ -59,7 +59,9 @@ outside GitHub Actions.
 
 ## Release contents
 
+- `Stel-X.Y.Z-linux-x86_64.deb` and `.rpm`
 - `Stel-X.Y.Z-linux-x86_64.run` and `.tar.gz`
+- `Stel-X.Y.Z-windows-x64-setup.exe`
 - `Stel-X.Y.Z-windows-x64.exe` and `.zip`
 - `Stel-source-X.Y.Z.tar.gz`
 - `Stel-X.Y.Z-dependencies-linux-sources.tar.gz`
@@ -90,3 +92,17 @@ App screenshots come from local test accounts, not from private PBX captures.
 
 GitHub references: [publishing with GitHub CLI](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-github-cli),
 [Pages deployment source](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
+
+## Installer validation
+
+Windows uses NSIS 3.11.0 and installs for the current user without elevation.
+CI silently installs into a Unicode path, verifies shortcuts and the uninstall
+entry, reinstalls, launches the program and uninstalls. Unrelated files and
+user profiles are preserved.
+
+Linux .deb/.rpm contain the audited native single-file binary under `/opt/stel`,
+with `/usr/bin/stel`, a desktop entry and icons. The package dependencies encode
+the bundle manifest's minimum glibc. Archive verification checks the binary
+SHA-256 so RPM post-processing cannot silently truncate the appended payload.
+Debian and Fedora CI jobs install, reinstall, launch and remove their packages.
+All installer tests must pass before publication. See [installation](INSTALLING.md).

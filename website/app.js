@@ -34,12 +34,12 @@ for (const link of document.querySelectorAll('.shot')) {
 }
 document.getElementById('close-preview').addEventListener('click', () => preview.close());
 preview.addEventListener('click', event => { if (event.target === preview) preview.close(); });
-// Until a release exists, both buttons retain their useful repository-release fallback.
+// Missing assets keep their repository-release fallback until a new release is available.
 fetch('https://api.github.com/repos/seifzadeh/stel/releases/latest', {headers: {Accept: 'application/vnd.github+json'}})
   .then(response => response.ok ? response.json() : null)
   .then(release => {
     if (!release) return;
-    for (const [id, suffix] of [['linux-download', '-linux-x86_64.run'], ['windows-download', '-windows-x64.exe']]) {
+    for (const [id, suffix] of [['linux-download', '-linux-x86_64.run'], ['windows-download', '-windows-x64-setup.exe'], ['deb-download', '-linux-x86_64.deb'], ['rpm-download', '-linux-x86_64.rpm']]) {
       const asset = release.assets.find(item => item.name.endsWith(suffix));
       if (asset && asset.browser_download_url.startsWith('https://github.com/seifzadeh/stel/releases/download/')) {
         document.getElementById(id).href = asset.browser_download_url;
