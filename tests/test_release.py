@@ -88,16 +88,36 @@ class ReleaseTests(unittest.TestCase):
             root = Path(tmp);payload = root / 'Stel.exe';payload.write_bytes(b'MZfixture')
             manifest = root / 'bundle.json'
             manifest.write_text(json.dumps({'version':'1.2.2','architecture':'x64'}))
-            with mock.patch.object(installers.subprocess, 'check_output') as execute:
+            with mock.patch.object(installers.subprocess, 'run') as execute:
                 with self.assertRaises(ValueError):installers.validate_payload(payload,manifest,'1.2.3','windows')
                 execute.assert_not_called()
             manifest.write_text(json.dumps({'version':'1.2.3','architecture':'x64'}))
-            with mock.patch.object(installers.subprocess, 'check_output', return_value='Stel 1.2.2\n'):
+            result = subprocess.CompletedProcess([], 0, 'Stel 1.2.2\n', '')
+            with mock.patch.object(installers.subprocess, 'run', return_value=result):
                 with self.assertRaises(ValueError):installers.validate_payload(payload,manifest,'1.2.3','windows')
             payload.write_bytes(b'\x7fELFfixture')
-            with mock.patch.object(installers.subprocess, 'check_output') as execute:
+            with mock.patch.object(installers.subprocess, 'run') as execute:
                 with self.assertRaises(ValueError):installers.validate_payload(payload,manifest,'1.2.3','windows')
                 execute.assert_not_called()
+
+    def test_installer_version_validation_with_runtime_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp);payload = root / 'Stel.exe';payload.write_bytes(b'MZfixture')
+            manifest = root / 'bundle.json'
+            data = {'version': '1.2.3', 'architecture': 'x64'}
+            manifest.write_text(json.dumps(data))
+            for output in ('Stel 1.2.3\r\n', 'Runtime initialization\r\nStel 1.2.3\r\n'):
+                with self.subTest(output=output):
+                    result = subprocess.CompletedProcess([], 0, output, 'Runtime diagnostic')
+                    with mock.patch.object(installers.subprocess, 'run', return_value=result):
+                        self.assertEqual(installers.validate_payload(payload,manifest,'1.2.3','windows'), data)
+            for output in ('', 'Runtime uses 1.2.3\n', 'Stel 1.2.2\nRuntime mentions 1.2.3\n',
+                           'Stel 1.2.3\nStel 1.2.2\n', 'Stel 1.2.30\n'):
+                with self.subTest(output=output):
+                    result = subprocess.CompletedProcess([], 0, output, 'Runtime diagnostic')
+                    with mock.patch.object(installers.subprocess, 'run', return_value=result):
+                        with self.assertRaisesRegex(ValueError, 'stdout=.*stderr='):
+                            installers.validate_payload(payload,manifest,'1.2.3','windows')
 
     def test_local_publisher_refuses_without_github_access(self):
         import os

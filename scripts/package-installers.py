@@ -29,9 +29,18 @@ def validate_payload(payload, manifest, expected_version, platform):
         raise ValueError('Executable format does not match the installer platform')
     # Windows runs --version without loading the GUI. Linux launchers also
     # support it without depending on a display or developer library paths.
-    result = subprocess.check_output([str(payload.resolve()), '--version'], text=True).strip()
-    if result != 'Stel ' + expected_version:
-        raise ValueError('Portable executable version differs from its bundle manifest')
+    result = subprocess.run([str(payload.resolve()), '--version'], capture_output=True,
+                            text=True, encoding='utf-8', errors='replace', timeout=60,
+                            check=True)
+    # Runtime libraries may print their own startup messages on Windows. Match
+    # the application's complete version line, never a substring in those logs.
+    versions = [line.strip() for line in result.stdout.splitlines()
+                if re.fullmatch(r'Stel \d+\.\d+\.\d+', line.strip())]
+    print(f'Portable --version stdout: {result.stdout!r}')
+    if versions != ['Stel ' + expected_version]:
+        raise ValueError(f'Portable executable version differs from its bundle manifest: '
+                         f'expected Stel {expected_version!s}; '
+                         f'stdout={result.stdout!r}; stderr={result.stderr!r}')
     return data
 
 

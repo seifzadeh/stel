@@ -8,6 +8,8 @@
   install the audited portable binary and declare its minimum glibc version.
 - Build all installers in the existing release workflow. Gate publication on
   Debian, Fedora and Windows install/reinstall/launch/uninstall checks.
+- Validate the explicit application version separately from runtime startup
+  messages and include captured output in installer validation failures.
 - Keep portable downloads and dependency sources, checksum all new assets and
   include chassis artwork in the corresponding source archive.
 
