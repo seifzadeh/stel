@@ -106,7 +106,9 @@ class ReleaseTests(unittest.TestCase):
             manifest = root / 'bundle.json'
             data = {'version': '1.2.3', 'architecture': 'x64'}
             manifest.write_text(json.dumps(data))
-            for output in ('Stel 1.2.3\r\n', 'Runtime initialization\r\nStel 1.2.3\r\n'):
+            for output in ('Stel 1.2.3\r\n', 'Runtime initialization\r\nStel 1.2.3\r\n',
+                           'Stel 1.2.3\n2026-11-16 16:39:48:179 ortp-warning- '
+                           'ortp_exit() called without prior call to ortp_init(), ignored.\n\n'):
                 with self.subTest(output=output):
                     result = subprocess.CompletedProcess([], 0, output, 'Runtime diagnostic')
                     with mock.patch.object(installers.subprocess, 'run', return_value=result):

@@ -14,8 +14,8 @@ RequestExecutionLevel user
 ManifestSupportedOS all
 SetCompressor zlib
 SetCompress off
-Icon "${PROJECT}/packaging/stel.ico"
-UninstallIcon "${PROJECT}/packaging/stel.ico"
+Icon "${PROJECT}\packaging\stel.ico"
+UninstallIcon "${PROJECT}\packaging\stel.ico"
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey /LANG=1033 "ProductName" "Stel"
 VIAddVersionKey /LANG=1033 "ProductVersion" "${VERSION}"
@@ -27,7 +27,7 @@ VIAddVersionKey /LANG=1033 "LegalCopyright" "Mehrdad Seifzadeh - GPL-3.0-or-late
 !define MUI_FINISHPAGE_RUN "$INSTDIR\Stel.exe"
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "${PROJECT}/LICENSE"
+!insertmacro MUI_PAGE_LICENSE "${PROJECT}\LICENSE"
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -76,9 +76,9 @@ Section "Stel (required)"
   Call RequireClosed
   SetOutPath "$INSTDIR"
   File /oname=Stel.exe "${PAYLOAD}"
-  File /oname=stel.ico "${PROJECT}/packaging/stel.ico"
-  File /oname=LICENSE.txt "${PROJECT}/LICENSE"
-  File "${PROJECT}/THIRD_PARTY.md"
+  File /oname=stel.ico "${PROJECT}\packaging\stel.ico"
+  File /oname=LICENSE.txt "${PROJECT}\LICENSE"
+  File "${PROJECT}\THIRD_PARTY.md"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   CreateDirectory "$SMPROGRAMS\Stel"
   CreateShortcut "$SMPROGRAMS\Stel\Stel.lnk" "$INSTDIR\Stel.exe" "" "$INSTDIR\stel.ico"

@@ -10,6 +10,7 @@
   Debian, Fedora and Windows install/reinstall/launch/uninstall checks.
 - Validate the explicit application version separately from runtime startup
   messages and include captured output in installer validation failures.
+- Use native Windows source paths for installer icons and bundled notices.
 - Keep portable downloads and dependency sources, checksum all new assets and
   include chassis artwork in the corresponding source archive.
 
