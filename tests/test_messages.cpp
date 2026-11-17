@@ -37,6 +37,18 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(replied(),7000);
         for(const auto &m:events)if(m.incoming){QVERIFY(m.id.startsWith("in-"));QVERIFY(m.timestamp.isValid());QVERIFY(m.unread);}
     }
+    void udpRetransmissionDoesNotDuplicateDelivery(){
+        QTemporaryDir tmp;MiniPbx pbx;IsolatedSipEngine receiver;QVERIFY(receiver.start({},tmp.path(),true));QVERIFY(receiver.addAccount(account("bob",pbx)));QTRY_VERIFY(pbx.registered("bob"));
+        QUdpSocket sender;QVERIFY(sender.bind(QHostAddress(QHostAddress::LocalHost),quint16(0)));int replies=0;
+        connect(&sender,&QUdpSocket::readyRead,this,[&]{while(sender.hasPendingDatagrams()){QByteArray packet(int(sender.pendingDatagramSize()),0);sender.readDatagram(packet.data(),packet.size());if(packet.startsWith("SIP/2.0 200")&&packet.contains("CSeq: 1 MESSAGE"))++replies;}});
+        const auto body=QString::fromUtf8("سلام — same text, separate transactions").toUtf8();
+        const auto packet=[&](const QByteArray &transaction){return "MESSAGE sip:bob@localhost SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:"+QByteArray::number(sender.localPort())+";branch=z9hG4bK-"+transaction+"\r\nMax-Forwards: 70\r\nFrom: <sip:alice@localhost>;tag=sender\r\nTo: <sip:bob@localhost>\r\nCall-ID: "+transaction+"@test\r\nCSeq: 1 MESSAGE\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: "+QByteArray::number(body.size())+"\r\n\r\n"+body;};
+        QSignalSpy changed(&receiver,&SipEngine::messageChanged);
+        const auto first=packet("first");QVERIFY(sender.writeDatagram(first,QHostAddress::LocalHost,pbx.port())>0);QTRY_COMPARE_WITH_TIMEOUT(replies,1,6000);QCOMPARE(changed.size(),1);QCOMPARE(pbx.messageBodies.size(),1);
+        QVERIFY(sender.writeDatagram(first,QHostAddress::LocalHost,pbx.port())>0);QTRY_COMPARE_WITH_TIMEOUT(replies,2,6000);QCOMPARE(changed.size(),1);QCOMPARE(pbx.messageBodies.size(),1);
+        const auto second=packet("second");QVERIFY(sender.writeDatagram(second,QHostAddress::LocalHost,pbx.port())>0);QTRY_COMPARE_WITH_TIMEOUT(replies,3,6000);QCOMPARE(changed.size(),2);QCOMPARE(pbx.messageBodies.size(),2);
+        for(const auto &event:changed){const auto message=qvariant_cast<MessageInfo>(event[0]);QVERIFY(message.incoming);QCOMPARE(message.text.toUtf8(),body);}
+    }
     void failureAndValidation(){
         QTemporaryDir tmp;MiniPbx pbx;IsolatedSipEngine e;QVERIFY(e.start({},tmp.path(),true));QVERIFY(e.addAccount(account("alice",pbx)));
         QTRY_VERIFY_WITH_TIMEOUT(pbx.registered("alice"),6000);QSignalSpy changed(&e,&SipEngine::messageChanged);

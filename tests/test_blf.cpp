@@ -52,7 +52,7 @@ private slots:
         pbx.notifyBlf("2001",document(1,dialog("call","early")));QTRY_COMPARE(engine.blfInfo(0).state,BlfState::Ringing);
         pbx.notifyBlf("2001",document(2,dialog("call","confirmed")));QTRY_COMPARE(engine.blfInfo(0).state,BlfState::Busy);QTRY_COMPARE(engine.blfInfo(11).state,BlfState::Busy);
         engine.refreshRegistrations();QTest::qWait(150);QCOMPARE(engine.blfInfo(0).state,BlfState::Busy);
-        pbx.notifyBlf("2001",document(3,dialog("call","terminated"),"partial"));QTRY_COMPARE(engine.blfInfo(0).state,BlfState::Idle);
+        pbx.notifyBlf("2001",document(3,dialog("call","terminated"),"partial"));QTRY_COMPARE(engine.blfInfo(0).state,BlfState::Idle);QTRY_COMPARE(engine.blfInfo(11).state,BlfState::Idle);
         QVERIFY(engine.setRegistration("1001",false));QCOMPARE(engine.blfInfo(0).state,BlfState::Unknown);QCOMPARE(engine.blfInfo(11).state,BlfState::Idle);
         QTRY_VERIFY(pbx.blfUnsubscribes>0);QVERIFY(pbx.blfNotifyReplies>0);
         QVERIFY(engine.setRegistration("1001",true));QTRY_COMPARE(engine.blfInfo(0).state,BlfState::Idle);

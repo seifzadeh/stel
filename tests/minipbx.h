@@ -51,6 +51,7 @@ private:
     QHash<QString,Dialog> dialogs_;
     QHash<QString,Transaction> transactions_;
     QHash<QString,QString> inviteBranches_;
+    QHash<QString,QString> messageBranches_;
     static QByteArray header(const QList<QByteArray> &lines,const QByteArray &name) {
         for(const auto &line:lines){const int c=line.indexOf(':');if(c>0&&line.left(c).trimmed().toLower()==name)return line.mid(c+1).trimmed();}return {};
     }
@@ -106,17 +107,23 @@ private:
                 send(lines,body,transaction.address,transaction.port);continue;
             }
             if(lines[0].startsWith("MESSAGE ")){
-                if(header(lines,"content-type").startsWith("text/plain")){
+                // UDP retransmissions belong to the original SIP transaction.
+                // Retain the forwarded Via branch so the receiver replays its
+                // response instead of receiving another application message.
+                const auto key=id+'\n'+QString::fromUtf8(header(lines,"cseq"))+'\n'+QString::fromUtf8(header(lines,"via"))+'\n'+address.toString()+':'+QString::number(port);
+                const bool first=!messageBranches_.contains(key);
+                if(first)messageBranches_[key]="z9hG4bK-message-"+QUuid::createUuid().toString(QUuid::WithoutBraces);
+                const auto branch=messageBranches_.value(key);
+                if(first&&header(lines,"content-type").startsWith("text/plain")){
                     messageBodies<<body;messageFrom<<header(lines,"from");messageTo<<header(lines,"to");messageContentTypes<<header(lines,"content-type");
                 }
                 const auto destination=bindings_.value(user(header(lines,"to")));
                 if(!destination.port){
-                    ++rejectedMessages;
+                    if(first)++rejectedMessages;
                     QList<QByteArray> response{"SIP/2.0 404 Not Found"};
                     for(const auto &key:{"via","from","to","call-id","cseq"})response<<QByteArray(key)+": "+header(lines,key)+(QByteArray(key)=="to"?";tag=missing":"");
                     response<<"Content-Length: 0";send(response,{},address,port);continue;
                 }
-                const auto branch="z9hG4bK-message-"+QUuid::createUuid().toString(QUuid::WithoutBraces);
                 QList<QByteArray> vias;for(const auto &line:lines)if(line.toLower().startsWith("via:"))vias<<line;
                 transactions_[branch]={address,port,id.toUtf8(),vias};
                 auto target=destination.contact;if(bareRequestUri)target.replace(QRegularExpression("(?<=sip:)[^@]+@"),"");
