@@ -94,6 +94,7 @@ void styleNavigationTabs(QTabWidget *pages,NavigationLevel level){
     auto *bar=pages->tabBar();bar->setDrawBase(false);bar->setExpanding(false);bar->setUsesScrollButtons(true);bar->setElideMode(Qt::ElideNone);
     const bool compact=level==NavigationLevel::Compact,settings=level==NavigationLevel::Settings;
     const bool manySettings=settings&&pages->count()>6;
+    if(settings&&pages->count()>7){auto font=bar->font();font.setPixelSize(15);bar->setFont(font);}
     pages->setIconSize(QSize(compact?17:settings?23:21,compact?17:settings?23:21));
     bar->setStyleSheet(QString(R"(
         QTabBar { background:transparent; border:0; }

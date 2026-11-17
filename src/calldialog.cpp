@@ -1,6 +1,8 @@
 #include "calldialog.h"
 #include "branding.h"
 #include "videoview.h"
+#include "inlinecallhost.h"
+#include <QHideEvent>
 #include <QApplication>
 #include <QComboBox>
 #include <QCloseEvent>
@@ -59,7 +61,7 @@ CallDialog::CallDialog(SipEngine &engine,const CallInfo &info,QWidget *parent):Q
     setMinimumSize(480,qMin(580,qMax(480,available)));resize(550,qMin(740,qMax(480,available)));
     auto *outer=new QVBoxLayout(this);outer->setContentsMargins(12,12,12,12);
     auto *scroll=new QScrollArea;scroll->setWidgetResizable(true);scroll->setFrameShape(QFrame::NoFrame);outer->addWidget(scroll,1);
-    auto *body=new QWidget;body->setObjectName("callBody");scroll->setWidget(body);auto *layout=new QVBoxLayout(body);layout->setContentsMargins(8,8,8,8);layout->setSpacing(12);
+    auto *body=new QWidget;body_=body;body->setObjectName("callBody");scroll->setWidget(body);auto *layout=new QVBoxLayout(body);bodyLayout_=layout;layout->setContentsMargins(8,8,8,8);layout->setSpacing(12);
     auto *top=new QHBoxLayout;auto *logo=new QLabel;logo->setPixmap(applicationIcon().pixmap(28,28));top->addWidget(logo);
     direction_=plainLabel("callDirection");top->addWidget(direction_);top->addStretch();duration_=plainLabel("callDuration");duration_->setStyleSheet("font-size:20px;font-weight:600;color:#132c3b;");top->addWidget(duration_);layout->addLayout(top);
     auto *card=new QFrame;card->setObjectName("callIdentity");auto *identity=new QVBoxLayout(card);identity->setSpacing(5);
@@ -79,7 +81,7 @@ CallDialog::CallDialog(SipEngine &engine,const CallInfo &info,QWidget *parent):Q
     keyLayout->addLayout(grid);mediaTabs_->addTab(keypad,"Keypad");
     auto *video=new QWidget;auto *videoLayout=new QVBoxLayout(video);remoteVideo_=new VideoView;remoteVideo_->setObjectName("callRemoteVideo");remoteVideo_->setMinimumSize(300,180);videoLayout->addWidget(remoteVideo_,1);
     previewVideo_=new VideoView;previewVideo_->setObjectName("callPreviewVideo");previewVideo_->setMinimumSize(120,80);previewVideo_->setMaximumSize(150,90);videoLayout->addWidget(previewVideo_,0,Qt::AlignRight);mediaTabs_->addTab(video,"Video");
-    auto *details=new QWidget;auto *detailsLayout=new QVBoxLayout(details);mediaDetails_=plainLabel("callMediaDetails");mediaDetails_->setTextInteractionFlags(Qt::TextSelectableByMouse);detailsLayout->addWidget(mediaDetails_);detailsLayout->addStretch();mediaTabs_->addTab(details,"Details");
+    auto *details=new QWidget;detailsPage_=details;auto *detailsLayout=new QVBoxLayout(details);mediaDetails_=plainLabel("callMediaDetails");mediaDetails_->setTextInteractionFlags(Qt::TextSelectableByMouse);detailsLayout->addWidget(mediaDetails_);detailsLayout->addStretch();mediaTabs_->addTab(details,"Details");
     auto *controls=new QGridLayout;controls->setSpacing(6);
     hold_=button("Hold","callHold");mute_=button("Mute mic","callMute");mute_->setCheckable(true);record_=button("Record","callRecord");record_->setCheckable(true);
     transfer_=button("Transfer","callTransfer");forward_=button("Forward","callForward");attended_=button("Attended transfer","callAttendedTransfer");conference_=button("Conference","callConference");addCall_=button("Add call","callAddCall");
@@ -87,7 +89,7 @@ CallDialog::CallDialog(SipEngine &engine,const CallInfo &info,QWidget *parent):Q
     routePanel_=new QGroupBox;routePanel_->setObjectName("callRoutePanel");auto *route=new QVBoxLayout(routePanel_);routeHint_=plainLabel("callRouteHint");route->addWidget(routeHint_);routeTarget_=new QLineEdit;routeTarget_->setObjectName("callRouteTarget");routeTarget_->setPlaceholderText("Extension or SIP address");route->addWidget(routeTarget_);auto *routeButtons=new QHBoxLayout;routeApply_=button("Transfer","callRouteApply");auto *cancelRoute=button("Cancel","callRouteCancel");routeButtons->addWidget(routeApply_);routeButtons->addWidget(cancelRoute);route->addLayout(routeButtons);layout->addWidget(routePanel_);routePanel_->hide();
     peerPanel_=new QGroupBox;peerPanel_->setObjectName("callPeerPanel");auto *peer=new QVBoxLayout(peerPanel_);peerHint_=plainLabel("callPeerHint");peer->addWidget(peerHint_);peerChoice_=new QComboBox;peerChoice_->setObjectName("callPeerChoice");peer->addWidget(peerChoice_);auto *peerButtons=new QHBoxLayout;peerApply_=button("Apply","callPeerApply");auto *cancelPeer=button("Cancel","callPeerCancel");peerButtons->addWidget(peerApply_);peerButtons->addWidget(cancelPeer);peer->addLayout(peerButtons);layout->addWidget(peerPanel_);peerPanel_->hide();
     message_=plainLabel("callActionResult");message_->setStyleSheet("color:#b33748;");message_->hide();layout->addWidget(message_);layout->addStretch();
-    auto *footer=new QHBoxLayout;auto *hint=plainLabel();hint->setText("Closing an active call asks before disconnecting.");hint->setStyleSheet("font-size:10px;color:#607688;");footer->addWidget(hint,1);auto *closeButton=button("Close window","callClose");footer->addWidget(closeButton);outer->addLayout(footer);
+    auto *footer=new QHBoxLayout;auto *hint=plainLabel();hint->setText("Closing an active call asks before disconnecting.");hint->setStyleSheet("font-size:10px;color:#607688;");footer->addWidget(hint,1);dock_=button("Return to phone","callDock");dock_->hide();footer->addWidget(dock_);connect(dock_,&QPushButton::clicked,this,[this]{hide();emit dockRequested();});auto *closeButton=button("Close window","callClose");footer->addWidget(closeButton);outer->addLayout(footer);
     endTimer_=new QTimer(this);endTimer_->setSingleShot(true);connect(endTimer_,&QTimer::timeout,this,[this]{close();});
     connect(closeButton,&QPushButton::clicked,this,&QDialog::close);
     connect(answer_,&QPushButton::clicked,this,[this]{check(engine_.answer(info_.id,false));});connect(answerVideo_,&QPushButton::clicked,this,[this]{check(engine_.answer(info_.id,true));});
@@ -95,13 +97,13 @@ CallDialog::CallDialog(SipEngine &engine,const CallInfo &info,QWidget *parent):Q
     connect(hold_,&QPushButton::clicked,this,[this]{check(engine_.hold(info_.id,info_.rawState!=LinphoneCallPaused));});
     connect(mute_,&QPushButton::clicked,this,[this](bool checked){if(!check(engine_.muteCall(info_.id,checked))){const QSignalBlocker block(mute_);mute_->setChecked(info_.muted);}});
     connect(record_,&QPushButton::clicked,this,[this](bool checked){if(!check(engine_.record(info_.id,checked))){const QSignalBlocker block(record_);record_->setChecked(info_.recording);}});
-    connect(transfer_,&QPushButton::clicked,this,[this,scroll]{openRoute(RouteAction::Transfer);QTimer::singleShot(0,this,[this,scroll]{scroll->ensureWidgetVisible(routePanel_);});});
-    connect(ringTransfer_,&QPushButton::clicked,this,[this,scroll]{openRoute(RouteAction::Transfer);QTimer::singleShot(0,this,[this,scroll]{scroll->ensureWidgetVisible(routePanel_);});});
-    connect(forward_,&QPushButton::clicked,this,[this,scroll]{openRoute(RouteAction::Forward);QTimer::singleShot(0,this,[this,scroll]{scroll->ensureWidgetVisible(routePanel_);});});
-    connect(routeApply_,&QPushButton::clicked,this,&CallDialog::applyRoute);connect(routeTarget_,&QLineEdit::returnPressed,this,&CallDialog::applyRoute);connect(cancelRoute,&QPushButton::clicked,routePanel_,&QWidget::hide);
-    connect(attended_,&QPushButton::clicked,this,[this,scroll]{openPeers(PeerAction::Attended);QTimer::singleShot(0,this,[this,scroll]{scroll->ensureWidgetVisible(peerPanel_);});});
-    connect(conference_,&QPushButton::clicked,this,[this,scroll]{openPeers(PeerAction::Conference);QTimer::singleShot(0,this,[this,scroll]{scroll->ensureWidgetVisible(peerPanel_);});});
-    connect(peerApply_,&QPushButton::clicked,this,&CallDialog::applyPeer);connect(cancelPeer,&QPushButton::clicked,peerPanel_,&QWidget::hide);connect(addCall_,&QPushButton::clicked,this,&CallDialog::requestNewCall);
+    connect(transfer_,&QPushButton::clicked,this,[this,scroll]{openRoute(RouteAction::Transfer);QTimer::singleShot(0,this,[this,scroll]{if(!inlineHost_)scroll->ensureWidgetVisible(routePanel_);});});
+    connect(ringTransfer_,&QPushButton::clicked,this,[this,scroll]{openRoute(RouteAction::Transfer);QTimer::singleShot(0,this,[this,scroll]{if(!inlineHost_)scroll->ensureWidgetVisible(routePanel_);});});
+    connect(forward_,&QPushButton::clicked,this,[this,scroll]{openRoute(RouteAction::Forward);QTimer::singleShot(0,this,[this,scroll]{if(!inlineHost_)scroll->ensureWidgetVisible(routePanel_);});});
+    connect(routeApply_,&QPushButton::clicked,this,&CallDialog::applyRoute);connect(routeTarget_,&QLineEdit::returnPressed,this,&CallDialog::applyRoute);connect(cancelRoute,&QPushButton::clicked,this,&CallDialog::closeInlinePanels);
+    connect(attended_,&QPushButton::clicked,this,[this,scroll]{openPeers(PeerAction::Attended);QTimer::singleShot(0,this,[this,scroll]{if(!inlineHost_)scroll->ensureWidgetVisible(peerPanel_);});});
+    connect(conference_,&QPushButton::clicked,this,[this,scroll]{openPeers(PeerAction::Conference);QTimer::singleShot(0,this,[this,scroll]{if(!inlineHost_)scroll->ensureWidgetVisible(peerPanel_);});});
+    connect(peerApply_,&QPushButton::clicked,this,&CallDialog::applyPeer);connect(cancelPeer,&QPushButton::clicked,this,&CallDialog::closeInlinePanels);connect(addCall_,&QPushButton::clicked,this,&CallDialog::requestNewCall);
     connect(mediaTabs_,&QTabWidget::currentChanged,this,[this](int tab){if(tab==1)bindVideo();});
     setStyleSheet("QWidget#callBody{background:#e1e5eb;} QFrame#callIdentity{background:white;border:1px solid #d7e0e7;border-radius:8px;} QPushButton#callAnswer,QPushButton#callAnswerVideo{background:#168237;color:white;border:0;} QPushButton#callHangup{background:#bd4052;color:white;border:0;} QPushButton:checked{background:#dcecfb;border-color:#087bd2;color:#164a79;} QLabel#callDirection{color:#607688;font-size:11px;font-weight:600;}");
     for(const auto &fax:engine_.faxes())if(fax.callId==info.id)faxInfo_=fax;
@@ -109,7 +111,31 @@ CallDialog::CallDialog(SipEngine &engine,const CallInfo &info,QWidget *parent):Q
     updateCall(info,info.accountName,{});
     if(info.incoming&&info.rawState==LinphoneCallIncomingReceived)mediaTabs_->setCurrentIndex(2);
 }
-void CallDialog::showError(const QString &text){message_->setText(text);message_->setVisible(!text.isEmpty());}
+CallDialog::~CallDialog(){setInlineHost(nullptr);}
+bool CallDialog::canSendDtmf() const{return !keypad_.isEmpty()&&keypad_[0]->isEnabled();}
+QString CallDialog::dtmfText() const{return digits_->text();}
+QString CallDialog::actionMessage() const{return message_->isHidden()?QString():message_->text();}
+void CallDialog::enableDocking(){dock_->show();}
+QString CallDialog::peerName() const{return info_.remoteName.isEmpty()?(info_.remoteUsername.isEmpty()?info_.remote:info_.remoteUsername):info_.remoteName;}
+void CallDialog::closeInlinePanels(){routePanel_->hide();peerPanel_->hide();if(inlineHost_)inlineHost_->dismiss();showError({});}
+void CallDialog::setInlineHost(InlineCallHost *host){
+    if(host)host->setExpansionAvailable(info_.video);
+    if(inlineHost_==host)return;
+    disconnect(inlineBack_);disconnect(inlineWindow_);
+    if(inlineHost_){
+        inlineHost_->dismiss();
+        for(auto *panel:{routePanel_,peerPanel_})if(panel->parentWidget()!=body_){panel->setParent(body_);bodyLayout_->insertWidget(bodyLayout_->indexOf(message_),panel);panel->hide();}
+        if(mediaTabs_->indexOf(detailsPage_)<0)mediaTabs_->addTab(detailsPage_,"Details");
+    }
+    inlineHost_=host;
+    if(host){inlineBack_=connect(host,&InlineCallHost::backRequested,this,&CallDialog::closeInlinePanels);inlineWindow_=connect(host,&InlineCallHost::windowRequested,this,&CallDialog::expandRequested);}
+}
+void CallDialog::showInlineDetails(){
+    if(!inlineHost_)return;
+    closeInlinePanels();const int index=mediaTabs_->indexOf(detailsPage_);if(index>=0)mediaTabs_->removeTab(index);
+    inlineHost_->present(detailsPage_,"Call details · "+peerName());
+}
+void CallDialog::showError(const QString &text){message_->setText(text);message_->setVisible(!text.isEmpty());emit actionMessageChanged(text);}
 bool CallDialog::confirmClose(){
     if(callHasEnded(info_.rawState))return true;
     if(confirmingClose_)return false;
@@ -131,13 +157,14 @@ void CallDialog::closeEvent(QCloseEvent *event){
 bool CallDialog::check(bool success){if(success)showError({});else{showError(engine_.lastError().isEmpty()?"The action could not complete. The call may have ended.":engine_.lastError());if(callHasEnded(info_.rawState))endTimer_->start(6000);}return success;}
 void CallDialog::sendDigit(QChar digit){if(keypad_.isEmpty()||!keypad_[0]->isEnabled())return;if(check(engine_.dtmf(info_.id,digit.toLatin1()))){if(digits_->text().size()>=40)digits_->clear();digits_->setText(digits_->text()+digit);}}
 void CallDialog::keyPressEvent(QKeyEvent *event){const auto text=event->text();if(text.size()==1&&QString("0123456789*#").contains(text[0])&&!keypad_.isEmpty()&&keypad_[0]->isEnabled()){sendDigit(text[0]);event->accept();return;}QDialog::keyPressEvent(event);}
-void CallDialog::showEvent(QShowEvent *event){QDialog::showEvent(event);if(info_.video)bindVideo();}
-void CallDialog::bindVideo(){if(!info_.video||callHasEnded(info_.rawState))return;engine_.setCallVideoWindows(info_.id,remoteVideo_->surfaceId(),previewVideo_->surfaceId());videoBound_=true;}
+void CallDialog::showEvent(QShowEvent *event){setInlineHost(nullptr);QDialog::showEvent(event);if(info_.video){mediaTabs_->setCurrentIndex(1);bindVideo();}emit viewChanged();}
+void CallDialog::hideEvent(QHideEvent *event){QDialog::hideEvent(event);videoBound_=false;emit viewChanged();}
+void CallDialog::bindVideo(){if(!isVisible()||!info_.video||callHasEnded(info_.rawState))return;if(!videoBound_){remoteVideo_->clearFrame();previewVideo_->clearFrame();}engine_.setCallVideoWindows(info_.id,remoteVideo_->surfaceId(),previewVideo_->surfaceId());videoBound_=true;}
 void CallDialog::updateCall(const CallInfo &info,const QString &accountDetails,const QString &transport) {
     if(info.id!=info_.id)return;
     const bool justAnswered=info_.rawState==LinphoneCallIncomingReceived&&info.rawState!=LinphoneCallIncomingReceived&&!callHasEnded(info.rawState);
     info_=info;accountDetails_=accountDetails;transport_=transport;
-    const auto state=info.rawState;const bool ended=callHasEnded(state),incoming=info.incoming&&state==LinphoneCallIncomingReceived;
+    const auto state=info.rawState;const bool ended=callHasEnded(state),incoming=info.incoming&&(state==LinphoneCallIncomingReceived||state==LinphoneCallIncomingEarlyMedia);
     if(ended&&closeQuestion_)closeQuestion_->done(QMessageBox::No);
     const bool connected=state==LinphoneCallStreamsRunning,held=state==LinphoneCallPaused||state==LinphoneCallPausedByRemote,established=connected||held;
     const auto peer=info.remoteName.isEmpty()?(info.remoteUsername.isEmpty()?info.remote:info.remoteUsername):info.remoteName;
@@ -145,9 +172,9 @@ void CallDialog::updateCall(const CallInfo &info,const QString &accountDetails,c
     direction_->setText(info.paging?(info.pagingAutoAnswered?"PAGING / INTERCOM · AUTO ANSWERED":"INCOMING PAGE / INTERCOM"):info.incoming?"INCOMING CALL":"OUTGOING CALL");name_->setText(peer);address_->setText(info.remote);account_->setText("Account: "+accountDetails);
     duration_->setText(QString("%1:%2").arg(info.duration/60,2,10,QChar('0')).arg(info.duration%60,2,10,QChar('0')));
     status_->setText(!ended&&info.inConference?"Conference · "+QString::number(info.conferenceParticipants)+" participants":callStateLabel(state));status_->setStyleSheet("font-weight:600;color:"+QString(state==LinphoneCallError?"#b33748":connected?"#087f74":incoming?"#a16a16":"#526b7c")+";");
-    answer_->setVisible(incoming);answerVideo_->setVisible(incoming&&info.video&&!info.paging);hangup_->setText(incoming?"Reject":established?"Hang up":ended?"Call ended":"Cancel call");hangup_->setEnabled(!ended);
+    answer_->setVisible(incoming);answer_->setEnabled(incoming);answerVideo_->setVisible(incoming&&info.video&&!info.paging);answerVideo_->setEnabled(incoming&&info.video&&!info.paging);hangup_->setText(incoming?"Reject":established?"Hang up":ended?"Call ended":"Cancel call");hangup_->setEnabled(!ended);
     ringTransfer_->setVisible(incoming);if(justAnswered)mediaTabs_->setCurrentIndex(0);
-    fax_->setVisible(info.incoming&&!ended);fax_->setEnabled(incoming||connected||state==LinphoneCallUpdatedByRemote);
+    fax_->setVisible(info.incoming&&!ended);fax_->setEnabled(info.incoming&&(incoming||connected||state==LinphoneCallUpdatedByRemote));
     hold_->setEnabled(established&&!info.inConference);hold_->setText(state==LinphoneCallPaused?"Resume":"Hold");
     mute_->setEnabled(established&&(!info.inConference||connected));record_->setEnabled(connected);{const QSignalBlocker block(mute_);mute_->setChecked(info.muted);}{const QSignalBlocker block(record_);record_->setChecked(info.recording);}record_->setText(info.recording?"Stop recording":"Record");
     transfer_->setEnabled(incoming||established);forward_->setEnabled(incoming);attended_->setEnabled(established&&!info.inConference);conference_->setEnabled(established);addCall_->setEnabled(established&&!info.inConference);
@@ -167,12 +194,12 @@ void CallDialog::updateCall(const CallInfo &info,const QString &accountDetails,c
         if(!faxInfo_.detail.isEmpty())showError(faxInfo_.detail);
     }
     if(consultationPending_&&state==LinphoneCallPaused){consultationPending_=false;QTimer::singleShot(0,this,[this]{emit newCallRequested(info_.accountId);});}
-    if(ended&&!endScheduled_){endScheduled_=true;consultationPending_=false;digits_->clear();routePanel_->hide();peerPanel_->hide();setAttribute(Qt::WA_DeleteOnClose,true);if(state==LinphoneCallError)showError(info.error.isEmpty()?info.message:info.error);endTimer_->start(state==LinphoneCallError?6000:2500);}
+    if(ended&&!endScheduled_){endScheduled_=true;consultationPending_=false;digits_->clear();closeInlinePanels();setAttribute(Qt::WA_DeleteOnClose,true);if(state==LinphoneCallError)showError(info.error.isEmpty()?info.message:info.error);endTimer_->start(state==LinphoneCallError?6000:2500);}
 }
 void CallDialog::finishCall(const CallInfo &info){auto final=info;if(final.rawState!=LinphoneCallError)final.rawState=LinphoneCallEnd;updateCall(final,accountDetails_,transport_);if(!isVisible())deleteLater();}
-void CallDialog::openRoute(RouteAction action){routeAction_=action;peerPanel_->hide();routePanel_->setTitle(action==RouteAction::Forward?"Forward call":"Transfer call");routeApply_->setText(action==RouteAction::Forward?"Forward":"Transfer");routePanel_->show();updateCall(info_,accountDetails_,transport_);routeTarget_->setFocus();}
-void CallDialog::applyRoute(){if(!routeApply_->isEnabled())return;const auto target=routeTarget_->text().trimmed();if(target.isEmpty()){showError("Enter a destination.");return;}const bool ringing=info_.rawState==LinphoneCallIncomingReceived;const bool result=ringing?engine_.redirect(info_.id,target):engine_.transfer(info_.id,target);if(check(result))routePanel_->hide();}
-void CallDialog::openPeers(PeerAction action){peerAction_=action;routePanel_->hide();peerPanel_->setTitle(action==PeerAction::Attended?"Attended transfer":"Join conference");peerApply_->setText(action==PeerAction::Attended?"Complete transfer":"Join calls");peerPanel_->show();refreshPeers(peers_);}
+void CallDialog::openRoute(RouteAction action){routeAction_=action;peerPanel_->hide();routePanel_->setTitle(action==RouteAction::Forward?"Forward call":"Transfer call");routeApply_->setText(action==RouteAction::Forward?"Forward":"Transfer");if(inlineHost_)inlineHost_->present(routePanel_,routePanel_->title()+" · "+peerName());else routePanel_->show();updateCall(info_,accountDetails_,transport_);routeTarget_->setFocus();}
+void CallDialog::applyRoute(){if(!routeApply_->isEnabled())return;const auto target=routeTarget_->text().trimmed();if(target.isEmpty()){showError("Enter a destination.");return;}const bool ringing=info_.rawState==LinphoneCallIncomingReceived||info_.rawState==LinphoneCallIncomingEarlyMedia;const bool result=ringing?engine_.redirect(info_.id,target):engine_.transfer(info_.id,target);if(check(result))closeInlinePanels();}
+void CallDialog::openPeers(PeerAction action){peerAction_=action;routePanel_->hide();peerPanel_->setTitle(action==PeerAction::Attended?"Attended transfer":"Join conference");peerApply_->setText(action==PeerAction::Attended?"Complete transfer":"Join calls");if(inlineHost_)inlineHost_->present(peerPanel_,peerPanel_->title()+" · "+peerName());else peerPanel_->show();refreshPeers(peers_);}
 void CallDialog::refreshPeers(const QList<CallInfo> &calls) {
     peers_=calls;if(!peerPanel_->isVisible())return;const auto selected=peerChoice_->currentData().toString();const QSignalBlocker block(peerChoice_);peerChoice_->clear();
     for(const auto &peer:peers_)if(peer.id!=info_.id&&!callHasEnded(peer.rawState)) {
@@ -183,6 +210,6 @@ void CallDialog::refreshPeers(const QList<CallInfo> &calls) {
     const bool held=info_.rawState==LinphoneCallPaused;peerApply_->setEnabled(peerChoice_->count()>0&&!callHasEnded(info_.rawState)&&(peerAction_==PeerAction::Conference||held));
     peerHint_->setText(peerAction_==PeerAction::Conference?"Choose the call to join. Only this call and the selected call are added.":peerChoice_->count()==0?"Use Add call to dial a consultation, then select it here.":!held?"Put this call on Hold before completing the transfer.":"Choose the connected consultation call to complete the transfer.");
 }
-void CallDialog::applyPeer(){const auto other=peerChoice_->currentData().toString();if(other.isEmpty()||!peerApply_->isEnabled())return;const bool result=peerAction_==PeerAction::Attended?engine_.attendedTransfer(info_.id,other):engine_.conference(info_.id,other);if(check(result))peerPanel_->hide();}
+void CallDialog::applyPeer(){const auto other=peerChoice_->currentData().toString();if(other.isEmpty()||!peerApply_->isEnabled())return;const bool result=peerAction_==PeerAction::Attended?engine_.attendedTransfer(info_.id,other):engine_.conference(info_.id,other);if(check(result))closeInlinePanels();}
 void CallDialog::requestNewCall(){if(info_.rawState==LinphoneCallPaused){emit newCallRequested(info_.accountId);return;}consultationPending_=true;if(!check(engine_.hold(info_.id,true)))consultationPending_=false;}
 }

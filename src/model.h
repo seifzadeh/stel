@@ -1,5 +1,6 @@
 #pragma once
 #include <QJsonObject>
+#include "remotecontrolconfig.h"
 #include <QDateTime>
 #include <QString>
 #include <QStringList>
@@ -34,6 +35,7 @@ struct ExpansionKey {
     }
 };
 struct Preferences {
+    RemoteControlConfig remoteControl;
     QString caFile, inputDevice, outputDevice, videoDevice;
     QString signallingAddress, mediaAddress;
     int sipUdpPort = -1, sipTcpPort = -1, sipTlsPort = -1;

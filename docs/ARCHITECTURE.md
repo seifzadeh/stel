@@ -66,8 +66,19 @@ child certificate cores before the parent core, releasing calls and listeners.
 A QLockFile/QLocalServer pair activates the existing instance for a repeated
 launch using the same configuration directory.
 
-`MainWindow` indexes modeless call dialogs by stable call UUID, independently of
-which active-list row is selected. Closing a live dialog through the title-bar X,
+`MainWindow` indexes call controllers by stable call UUID, independently of
+which active-list row is selected. Calls stay on `DeskPhone` by default; hidden
+`CallDialog` instances share their action state and validation with the main
+controls. `InlineCallHost` borrows the selected controller's destination, peer
+selection or details panel for display inside the LCD. Panels return to their
+owner before changing call selection or expanding video.
+
+Video binds to the selected call's LCD thumbnail. Clicking the thumbnail opens
+the optional call window; Return to phone hides it and rebinds the renderer
+without ending the call. A full window can mirror frames to its LCD thumbnail.
+Nonselected inline calls release the thumbnail target, avoiding mixed frames.
+
+Closing a live dialog through the title-bar X,
 Escape/reject or the footer Close window button confirms disconnecting that UUID.
 No (also the default/Escape response) preserves both the dialog and session; Yes
 hangs up/rejects the call and closes the dialog only if the request succeeds.
@@ -76,7 +87,7 @@ dismisses the question without another termination request. Already-ended window
 close without confirmation. Explicit Hang up/Reject still ends the call directly. End/error windows disable controls and expire after
 a short grace period. SDK shutdown precedes destruction of native video surfaces.
 Each call supplies its own remote surface ID; the SDK's preview target is
-core-scoped and is rebound when a video dialog is shown. Automatic standalone SDK
+core-scoped and is rebound when the selected video view changes. Automatic standalone SDK
 video windows are disabled. Incoming video offers require explicit video consent.
 
 `VideoView` registers a per-factory MS2 display sink through a pre-start engine
@@ -135,3 +146,23 @@ upgrades/consent, credential-vault integration, crash recovery, code signing,
 Windows dependency/OS-version validation, static plugin registration, reproducible
 SDK builds and corresponding-source packaging. These are explicit release tasks,
 not claims of this starter's completed behaviour.
+
+
+## Remote Control
+
+`RemoteControlServer` is a bounded HTTP server on the GUI event loop. It calls
+`SipEngine` operations and publishes their normal state changes, so API and
+phone controls operate on the same call IDs. QtConcurrent prepares uploaded fax
+documents without blocking SIP iteration. Configuration writes use `Store` and
+refresh the desktop models; they are rejected while Settings is open.
+
+`RemoteControlConfig` persists a SHA-256 token hash, bind IP/port and IP/CIDR
+allow-list. Remote control starts disabled and binds loopback by default. HTTP
+Basic (stel/token) and Bearer authentication apply to every route. The SDK's
+bctoolbox TLS layer handles optional HTTPS over QTcpSocket, keeping the existing
+Windows 7/Qt 5.15.2 runtime dependency set. Connections and request sizes are
+bounded; only explicit prepared documents and completed fax files are downloadable.
+
+The compatibility dispatcher accepts selected Yealink HTTP Action URI names;
+JSON resources and a bounded cursor-based event journal expose additional Stel
+operations. See [API.md](API.md) for the supported commands and response contract.

@@ -120,6 +120,12 @@ void ChatWidget::setAccounts(const QVector<Account> &accounts){
     account_->setCurrentIndex(selected.isEmpty()?(account_->count()?0:-1):account_->findData(selected));
     refreshConversations();refreshMessages();updateSend();
 }
+bool ChatWidget::markMessageRead(const QString &id,QString *error){
+    auto next=messages_;bool found=false;for(auto &message:next)if(message.id==id){message.unread=false;found=true;}
+    if(!found){if(error)*error="Message does not exist.";return false;}
+    if(!historyWritable_||!store_.saveMessages(next,error))return false;
+    messages_=next;refreshConversations();refreshMessages();emit unreadCountChanged(unreadCount());return true;
+}
 int ChatWidget::unreadCount() const{int count=0;for(const auto &m:messages_)count+=m.incoming&&m.unread;return count;}
 void ChatWidget::openConversation(){
     const auto id=account_->currentData().toString();const auto peer=engine_.messageTarget(id,recipient_->text());

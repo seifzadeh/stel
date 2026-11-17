@@ -1,6 +1,7 @@
 #pragma once
 #include "sipengine.h"
 #include <QDialog>
+#include <QPointer>
 class QLabel;
 class QLineEdit;
 class QPushButton;
@@ -12,26 +13,44 @@ class QKeyEvent;
 class QShowEvent;
 class QCloseEvent;
 class QMessageBox;
+class QVBoxLayout;
+class QHideEvent;
 namespace stel {
 class VideoView;
+class InlineCallHost;
 QString callStateLabel(LinphoneCallState);
 bool callHasEnded(LinphoneCallState);
 class CallDialog : public QDialog {
     Q_OBJECT
 public:
     CallDialog(SipEngine &,const CallInfo &,QWidget *parent=nullptr);
+    ~CallDialog() override;
     const CallInfo &callInfo() const {return info_;}
     void updateCall(const CallInfo &,const QString &accountDetails,const QString &transport);
     void refreshPeers(const QList<CallInfo> &);
     void finishCall(const CallInfo &);
     void reject() override;
+    void setInlineHost(InlineCallHost *);
+    void showInlineDetails();
+    void sendDtmf(QChar digit){sendDigit(digit);}
+    bool canSendDtmf() const;
+    QString dtmfText() const;
+    QString actionMessage() const;
+    VideoView *remoteVideo() const {return remoteVideo_;}
+    VideoView *previewVideo() const {return previewVideo_;}
+    void enableDocking();
 signals:
     void newCallRequested(const QString &accountId);
     void faxRequested(const QString &callId);
+    void viewChanged();
+    void dockRequested();
+    void expandRequested();
+    void actionMessageChanged(const QString &);
 protected:
     void keyPressEvent(QKeyEvent *) override;
     void showEvent(QShowEvent *) override;
     void closeEvent(QCloseEvent *) override;
+    void hideEvent(QHideEvent *) override;
 private:
     enum class RouteAction {Transfer,Forward};
     enum class PeerAction {Attended,Conference};
@@ -55,6 +74,13 @@ private:
     bool endScheduled_=false,consultationPending_=false,videoBound_=false,videoOpened_=false;
     bool confirmingClose_=false;
     QMessageBox *closeQuestion_=nullptr;
+    QPointer<InlineCallHost> inlineHost_;
+    QVBoxLayout *bodyLayout_;
+    QWidget *body_,*detailsPage_;
+    QPushButton *dock_;
+    QMetaObject::Connection inlineBack_,inlineWindow_;
+    void closeInlinePanels();
+    QString peerName() const;
     bool confirmClose();
     void sendDigit(QChar);
     void showError(const QString &);

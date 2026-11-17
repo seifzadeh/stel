@@ -1,4 +1,5 @@
 #include "videoview.h"
+#include <QMouseEvent>
 #include <QHash>
 #include <QMutex>
 #include <QMutexLocker>
@@ -85,11 +86,14 @@ VideoView::VideoView(QWidget *parent):QWidget(parent) {
     setAttribute(Qt::WA_NativeWindow);setAttribute(Qt::WA_OpaquePaintEvent);
     auto *timer=new QTimer(this);timer->setInterval(40);
     connect(timer,&QTimer::timeout,this,[this]{
-        QImage next;{QMutexLocker lock(&frameMutex);next=latestFrames.take(surface_);}
+        QImage next;if(frameSource_)next=frameSource_->frame_;else {QMutexLocker lock(&frameMutex);next=latestFrames.take(surface_);}
         if(!next.isNull()){frame_=next;setProperty("hasVideoFrame",true);update();}
     });timer->start();
 }
 VideoView::~VideoView(){QMutexLocker lock(&frameMutex);surfaces.remove(surface_);latestFrames.remove(surface_);}
+void VideoView::setFrameSource(VideoView *source){if(frameSource_==source)return;frameSource_=source;clearFrame();}
+void VideoView::clearFrame(){frame_=QImage();setProperty("hasVideoFrame",false);{QMutexLocker lock(&frameMutex);latestFrames.remove(surface_);}update();}
+void VideoView::mouseReleaseEvent(QMouseEvent *event){if(event->button()==Qt::LeftButton){emit clicked();event->accept();return;}QWidget::mouseReleaseEvent(event);}
 quintptr VideoView::surfaceId(){
     const auto id=quintptr(winId());if(id!=surface_){QMutexLocker lock(&frameMutex);surfaces.remove(surface_);latestFrames.remove(surface_);surface_=id;surfaces.insert(id);}return id;
 }

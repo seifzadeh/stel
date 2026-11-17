@@ -5,6 +5,8 @@
 #include <QPixmap>
 class QTabWidget; class QComboBox; class QLineEdit; class QListWidget; class QLabel; class QPainter;
 namespace stel {
+class InlineCallHost;
+class VideoView;
 enum class DeskIcon { None, Phone, Hangup, Fax, Contacts, Messages, History, Hold, Transfer, Add, Conference, Record, Keypad, Mute, Speaker, Settings, Minimize, Maximize, Close, Redial, Video, Previous, Next, Attach, Check, Network };
 void paintDeskIcon(QPainter &,DeskIcon,const QRectF &,const QColor &color=Qt::white);
 class DeskButton : public QPushButton {
@@ -32,6 +34,10 @@ public:
     QListWidget *calls;
     QLabel *detail,*status;
     DeskButton *settings,*audioCall,*videoCall,*hangup,*hold,*mute,*transfer,*conference,*record,*addCall,*redial,*speaker,*openCall;
+    DeskButton *forward,*attended,*receiveFax;
+    InlineCallHost *callHost;
+    VideoView *remoteVideo,*previewVideo;
+    QLabel *callMessage,*dtmfDisplay;
     void dockFax(QWidget *);
     void refresh(const CallInfo &,int callCount,int registered,int accounts,int unread,int faxCount,bool faxBusy);
     void place(QWidget *,QRectF,qreal fontSize=0);
@@ -60,6 +66,7 @@ private:
     bool resizing_=false;
     DeskButton *navigation_[5],*idleLines_[2],*sip_,*faxStatus_;
     QPushButton *expansion_[ExpansionKeyCount];
+    QLabel *videoCaption_;
     CallInfo call_;
     int registered_=0,accounts_=0,callCount_=0;
     QWidget *fax_=nullptr;

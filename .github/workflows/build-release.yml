@@ -63,6 +63,7 @@ jobs:
         run: |
           python3 scripts/package-linux.py
           python3 scripts/ci/smoke-portable.py dist/Stel-linux-x86_64.run
+          python3 scripts/ci/smoke-remote-api.py dist/Stel-linux-x86_64.run
           python3 scripts/package-installers.py linux
           python3 scripts/ci/check-linux-packages.py
           python3 scripts/ci/smoke-linux-install.py deb "dist/stel_${{ needs.metadata.outputs.version }}_amd64.deb"

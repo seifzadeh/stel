@@ -27,3 +27,4 @@ Invoke-WebRequest 'https://curl.se/ca/cacert.pem' -OutFile $Ca
 Checked { python "$Project/scripts/package-windows.py" --qt $env:QT_ROOT_DIR --sdk "$Deps/sdk" `
     --keychain "$Deps/keychain" --fax "$Deps/fax" --ca $Ca --crt $Crt.FullName --ucrt $Ucrt --notices "$Deps/notices" }
 Checked { python "$Project/scripts/ci/smoke-portable.py" "$Project/dist/Stel-portable-windows-x64.exe" }
+Checked { python "$Project/scripts/ci/smoke-remote-api.py" "$Project/dist/Stel-portable-windows-x64.exe" }

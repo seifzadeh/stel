@@ -1,6 +1,9 @@
 // Capture the production widgets with disposable loopback SIP accounts.
 #include "mainwindow.h"
 #include "calldialog.h"
+#include "deskphone.h"
+#include "inlinecallhost.h"
+#include "videoview.h"
 #include "chatwidget.h"
 #include "faxwidget.h"
 #include "minipbx.h"
@@ -79,7 +82,7 @@ int main(int argc,char **argv){
             {{"name",QString::fromUtf8("پشتیبانی / Support")},{"uri","1002"}}}),"Cannot save demo contacts");
         MainWindow window(state.path());require(window.ready(),"Application could not start");
         window.resize(1448,1086);window.show();auto *engine=child<SipEngine>(window,"");
-        auto *pages=child<QTabWidget>(window,"mainPages");
+        auto *pages=child<QTabWidget>(window,"mainPages");auto *desk=child<DeskPhone>(window,"");
         waitFor([&]{return pbx.registered("1001")&&pbx.registered("1002");},"Demo accounts did not register");
         QJsonArray images;
         const auto capture=[&](QWidget &widget,const QString &name){
@@ -93,18 +96,22 @@ int main(int argc,char **argv){
         child<QComboBox>(window,"callAccount")->setCurrentIndex(child<QComboBox>(window,"callAccount")->findData(accounts[0].id));
         child<QLineEdit>(window,"dialTarget")->setText("1002");
         require(engine->dial(accounts[0].id,"1002",false),"Cannot place demo voice call");
-        waitFor([&]{return callDialog(window,true)&&callDialog(window,false);},"Incoming call window did not open");
-        auto *incoming=callDialog(window,true);incoming->resize(620,780);capture(*incoming,"incoming-call");
-        child<QPushButton>(*incoming,"callAnswer")->click();waitFor([&]{return running(*engine);},"Voice call did not connect");
-        auto *outgoing=callDialog(window,false);outgoing->resize(620,800);
-        child<QPushButton>(*outgoing,"callDtmf_5")->click();QTest::qWait(1200);capture(*outgoing,"call");
+        waitFor([&]{return callDialog(window,true)&&callDialog(window,false);},"Incoming call did not arrive");
+        auto *incoming=callDialog(window,true);require(!incoming->isVisible(),"Incoming call opened a window");capture(window,"incoming-call");
+        desk->audioCall->click();waitFor([&]{return running(*engine);},"Voice call did not connect");
+        child<QPushButton>(window,"deskKey_5")->click();QTest::qWait(1200);capture(window,"call");
+        desk->transfer->click();child<QLineEdit>(*desk->callHost,"callRouteTarget")->setText("1103");capture(window,"call-transfer");child<QPushButton>(*desk->callHost,"inlineCallBack")->click();
+        desk->conference->click();capture(window,"call-conference");child<QPushButton>(*desk->callHost,"inlineCallBack")->click();
+        desk->openCall->click();capture(window,"call-details");child<QPushButton>(*desk->callHost,"inlineCallBack")->click();
         const auto hangup=[&]{for(const auto &call:engine->calls())engine->hangup(call.id);waitFor([&]{return engine->calls().isEmpty();},"Calls did not end");QTest::qWait(2700);};
         hangup();
         require(engine->dial(accounts[0].id,"1002",true),"Cannot place demo video call");
-        waitFor([&]{return callDialog(window,true);},"Incoming video call did not open");
-        child<QPushButton>(*callDialog(window,true),"callAnswerVideo")->click();
-        waitFor([&]{auto *dialog=callDialog(window,false);return running(*engine)&&dialog&&child<QWidget>(*dialog,"callRemoteVideo")->property("hasVideoFrame").toBool();},"Video did not render",15000);
-        outgoing=callDialog(window,false);outgoing->resize(640,820);capture(*outgoing,"video-call");hangup();
+        waitFor([&]{return callDialog(window,true);},"Incoming video call did not arrive");
+        desk->videoCall->click();
+        waitFor([&]{return running(*engine)&&desk->remoteVideo->property("hasVideoFrame").toBool();},"Video did not render",15000);
+        capture(window,"video-call");QTest::mouseClick(desk->remoteVideo,Qt::LeftButton);
+        incoming=callDialog(window,true);waitFor([&]{return incoming->isVisible()&&incoming->remoteVideo()->property("hasVideoFrame").toBool();},"Expanded video did not render");
+        incoming->resize(640,820);capture(*incoming,"video-expanded");child<QPushButton>(*incoming,"callDock")->click();require(running(*engine),"Docking ended the video call");hangup();
 
         pages->setCurrentIndex(1);auto *chat=child<ChatWidget>(window,"");
         const auto message=[&](int from,const QString &to,const QString &body,int expected){
@@ -155,7 +162,7 @@ int main(int argc,char **argv){
         child<QPushButton>(*fax,"faxDeskTab0")->click();capture(window,"fax-send");pages->setCurrentIndex(0);
         require(engine->dial(accounts[0].id,"1002",false),"Cannot place the main-screen demo call");
         waitFor([&]{return callDialog(window,true);},"Main-screen incoming call did not open");
-        child<QPushButton>(*callDialog(window,true),"callAnswer")->click();waitFor([&]{return running(*engine);},"Main-screen call did not connect");
+        desk->audioCall->click();waitFor([&]{return running(*engine);},"Main-screen call did not connect");
         pbx.notifyBlf("1002","<dialog-info xmlns=\"urn:ietf:params:xml:ns:dialog-info\" version=\"1\" state=\"full\" entity=\"sip:1002@localhost\"><dialog id=\"demo-call\"><state>confirmed</state></dialog></dialog-info>");
         pbx.notifyBlf("1001","<dialog-info xmlns=\"urn:ietf:params:xml:ns:dialog-info\" version=\"1\" state=\"full\" entity=\"sip:1001@localhost\"><dialog id=\"demo-call\"><state>confirmed</state></dialog></dialog-info>");
         waitFor([&]{return engine->blfInfo(0).state==BlfState::Busy&&engine->blfInfo(1).state==BlfState::Busy;},"BLF busy notification did not arrive");
@@ -166,14 +173,14 @@ int main(int argc,char **argv){
         require(engine->dial(accounts[0].id,"1002",false),"Cannot place the demo page");
         waitFor([&]{return running(*engine);},"Demo page did not auto-answer");
         incoming=callDialog(window,true);require(incoming&&incoming->callInfo().pagingAutoAnswered&&incoming->callInfo().muted,"Paging microphone policy is missing");
-        incoming->resize(620,800);capture(*incoming,"paging-call");capture(window,"paging");hangup();pbx.incomingInviteHeaders.clear();
+        capture(window,"paging");desk->openCall->click();capture(window,"paging-call");child<QPushButton>(*desk->callHost,"inlineCallBack")->click();hangup();pbx.incomingInviteHeaders.clear();
         child<QLineEdit>(window,"dialTarget")->clear();capture(window,"main-idle");
         pages->setCurrentIndex(3);capture(window,"contacts");
         pages->setCurrentIndex(4);capture(window,"history");
 
         window.showSettings();auto *settings=child<QDialog>(window,"settingsDialog");settings->resize(1080,900);
         auto *settingsPages=child<QTabWidget>(*settings,"settingsPages");
-        for(const auto &entry:QList<QPair<int,QString>>{{0,"accounts"},{1,"codecs"},{2,"video-codecs"},{3,"network"},{4,"security"},{5,"expansion"},{6,"about"}}){
+        for(const auto &entry:QList<QPair<int,QString>>{{0,"accounts"},{1,"codecs"},{2,"video-codecs"},{3,"network"},{4,"security"},{5,"expansion"},{6,"about"},{7,"remote-api"}}){
             settings->resize(1080,entry.first==0||entry.first==6?900:800);settingsPages->setCurrentIndex(entry.first);
             if(entry.first==1){
                 auto *codecs=child<QListWidget>(*settings,"audioCodecs");QListWidgetItem *g729=nullptr;

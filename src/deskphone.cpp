@@ -1,6 +1,8 @@
 #include "deskphone.h"
 #include "calldialog.h"
 #include "branding.h"
+#include "inlinecallhost.h"
+#include "videoview.h"
 #include <QApplication>
 #include <QComboBox>
 #include <QDateTime>
@@ -149,11 +151,20 @@ DeskPhone::DeskPhone(QWidget *parent):QWidget(parent),chassis_(":/desk/chassis.p
     audioCall=button("Call",DeskIcon::Phone,{276,893,174,69});audioCall->caption="Answer";audioCall->horizontal=true;audioCall->setObjectName("deskAnswer");audioCall->setToolTip("Answer an incoming call, or call the entered number");
     hangup=button("Hang Up",DeskIcon::Hangup,{475,893,175,69});hangup->horizontal=true;hangup->setObjectName("deskHangup");
     speaker=button("Speaker",DeskIcon::Speaker,{675,893,156,69});speaker->horizontal=true;speaker->setProperty("darkInk",true);speaker->setCheckable(true);speaker->setObjectName("deskSpeaker");
-    const QStringList actions={"Hold","Transfer","Add Call","Conf.","Record","Keypad"};const DeskIcon symbols[]={DeskIcon::Hold,DeskIcon::Transfer,DeskIcon::Add,DeskIcon::Conference,DeskIcon::Record,DeskIcon::Keypad};
+    const QStringList actions={"Hold","Transfer","Add Call","Conf.","Record","Details"};const DeskIcon symbols[]={DeskIcon::Hold,DeskIcon::Transfer,DeskIcon::Add,DeskIcon::Conference,DeskIcon::Record,DeskIcon::Network};
     for(int n=0;n<6;++n){auto *b=button(actions[n],symbols[n],{518.+79*n,367,69,66},DeskButton::Glass);b->setObjectName("deskAction"+QString::number(n));if(n==0)connect(b,&QPushButton::clicked,hold,&QPushButton::click);if(n==1)connect(b,&QPushButton::clicked,transfer,&QPushButton::click);if(n==2)addCall=b;if(n==3)conference=b;if(n==4)record=b;if(n==5)openCall=b;}
-    openCall->setObjectName("openCallWindow");
+    openCall->setObjectName("deskCallDetails");
     videoCall=button("Video call",DeskIcon::Video,{1007,368,111,65},DeskButton::Glass);videoCall->setObjectName("deskVideoCall");
     detail=new QLabel(this);detail->setObjectName("deskCallDetail");detail->hide();
+    forward=button("Forward",DeskIcon::None,{632,328,99,29},DeskButton::Glass);forward->setObjectName("deskForward");
+    attended=button("Attended",DeskIcon::None,{740,328,120,29},DeskButton::Glass);attended->setObjectName("deskAttendedTransfer");attended->setToolTip("Attended transfer");
+    receiveFax=button("Fax",DeskIcon::None,{869,328,106,29},DeskButton::Glass);receiveFax->setObjectName("deskReceiveFax");
+    dtmfDisplay=new QLabel(this);dtmfDisplay->setObjectName("deskDtmfDisplay");dtmfDisplay->setStyleSheet("color:#ccefff;background:transparent;");place(dtmfDisplay,{521,329,101,25},13);
+    callMessage=new QLabel(this);callMessage->setObjectName("deskCallMessage");callMessage->setTextFormat(Qt::PlainText);callMessage->setStyleSheet("color:#ffd0b8;background:transparent;");place(callMessage,{511,437,613,18},12);
+    remoteVideo=new VideoView(this);remoteVideo->setObjectName("deskRemoteVideo");remoteVideo->setCursor(Qt::PointingHandCursor);remoteVideo->setToolTip("Click to open the video call window");place(remoteVideo,{1002,185,126,95});
+    previewVideo=new VideoView(this);previewVideo->setObjectName("deskPreviewVideo");previewVideo->setCursor(Qt::PointingHandCursor);place(previewVideo,{1056,306,72,49});
+    videoCaption_=new QLabel("Video ↗",this);videoCaption_->setAlignment(Qt::AlignCenter);videoCaption_->setStyleSheet("color:#daf0ff;background:transparent;");place(videoCaption_,{1002,282,126,21},12);
+    callHost=new InlineCallHost(this);place(callHost,{504,215,624,220});
     auto *timer=new QTimer(this);connect(timer,&QTimer::timeout,this,QOverload<>::of(&DeskPhone::update));timer->start(1000);
     auto *blink=new QTimer(this);connect(blink,&QTimer::timeout,this,[this]{for(auto *key:expansion_)if(static_cast<BlfState>(key->property("blfState").toInt())==BlfState::Ringing)key->update();});blink->start(450);
     pages->blockSignals(false);
@@ -183,6 +194,11 @@ void DeskPhone::arrange(){
     target->setVisible(pages->currentIndex()==0&&call_.id.isEmpty());account->setVisible(pages->currentIndex()==0&&call_.id.isEmpty());
     for(auto *b:{addCall,conference,record,openCall})b->setVisible(pages->currentIndex()==0);
     findChild<DeskButton*>("deskAction0")->setVisible(pages->currentIndex()==0);findChild<DeskButton*>("deskAction1")->setVisible(pages->currentIndex()==0);videoCall->setVisible(pages->currentIndex()==0);
+    const bool phone=pages->currentIndex()==0,active=!call_.id.isEmpty()&&!callHasEnded(call_.rawState);
+    for(auto *button:{forward,attended,receiveFax})button->setVisible(phone&&active);
+    const bool video=phone&&active&&call_.video;remoteVideo->setVisible(video);previewVideo->setVisible(video);videoCaption_->setVisible(video);
+    dtmfDisplay->setVisible(phone&&active&&!dtmfDisplay->text().isEmpty());callMessage->setVisible(phone&&!callMessage->text().isEmpty());
+    if(!phone)callHost->hide();
 }
 void DeskPhone::refresh(const CallInfo &call,int count,int registered,int accounts,int unread,int faxCount,bool faxBusy){
     call_=call;callCount_=count;registered_=registered;accounts_=accounts;calls->setVisible(count>0);for(int n=0;n<2;++n)idleLines_[n]->setVisible(n>=qMin(2,count));
@@ -190,7 +206,12 @@ void DeskPhone::refresh(const CallInfo &call,int count,int registered,int accoun
     faxStatus_->caption=faxBusy?"Fax in progress":"Fax Ready";faxStatus_->subcaption=QString::number(faxCount)+" received";faxStatus_->setProperty("statusDot",QColor(faxBusy?"#17a7ff":"#46e400"));faxStatus_->setToolTip(QString::number(faxCount)+" received faxes");navigation_[3]->caption=unread?"Messages ("+QString::number(unread)+")":"Messages";
     const bool active=!call.id.isEmpty()&&!callHasEnded(call.rawState);const bool incoming=active&&call.incoming&&(call.rawState==LinphoneCallIncomingReceived||call.rawState==LinphoneCallIncomingEarlyMedia);
     audioCall->setEnabled(incoming||!active);hangup->setEnabled(active);for(auto *b:{hold,mute,transfer,conference,record,openCall,findChild<DeskButton*>("deskAction0"),findChild<DeskButton*>("deskAction1")})b->setEnabled(active);hold->caption=call.rawState==LinphoneCallPaused?"Resume":"Hold";
+    audioCall->caption=incoming?"Answer":"Call";hangup->caption=incoming?"Reject":"Hang Up";
+    videoCall->caption=incoming&&call.video?"Answer video":active&&call.video?"Video ↗":"Video call";
+    videoCall->setEnabled(!active||(call.video&&!call.paging));
     mute->setCheckable(true);mute->setChecked(call.muted);record->setCheckable(true);record->setChecked(call.recording);arrange();update();
+    mute->caption=call.muted?"Unmute":"Mute";record->caption=call.recording?"Stop rec.":"Record";findChild<DeskButton*>("deskAction0")->caption=hold->caption;
+    for(auto *button:{audioCall,hangup,hold,mute,record,videoCall}){button->setText(button->caption);button->setAccessibleName(button->caption);}
 }
 void DeskPhone::paintEvent(QPaintEvent *){
     QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.setRenderHint(QPainter::SmoothPixmapTransform);p.fillRect(rect(),QColor("#dce0e6"));p.translate(offset_);p.scale(scale_,scale_);p.drawPixmap(QRectF(0,0,1448,1086),chassis_,QRectF(chassis_.rect()));

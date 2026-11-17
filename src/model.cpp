@@ -95,7 +95,7 @@ QString ExpansionKey::validate() const {
 }
 QJsonObject Preferences::toJson() const {
     QJsonArray keys;for(const auto &key:expansionKeys)keys.append(key.toJson());
-    return {{"caFile",caFile},{"inputDevice",inputDevice},{"outputDevice",outputDevice},{"videoDevice",videoDevice},{"dnd",dnd},
+    return {{"remoteControl",remoteControl.toJson()},{"caFile",caFile},{"inputDevice",inputDevice},{"outputDevice",outputDevice},{"videoDevice",videoDevice},{"dnd",dnd},
         {"signallingAddress",signallingAddress},{"mediaAddress",mediaAddress},
         {"customAudioCodecs",customAudioCodecs},{"customVideoCodecs",customVideoCodecs},
         {"audioCodecs",QJsonArray::fromStringList(audioCodecs)},{"videoCodecs",QJsonArray::fromStringList(videoCodecs)},{"expansionKeys",keys},
@@ -103,7 +103,7 @@ QJsonObject Preferences::toJson() const {
         {"audioPortMin",audioPortMin},{"audioPortMax",audioPortMax},{"videoPortMin",videoPortMin},{"videoPortMax",videoPortMax}};
 }
 Preferences Preferences::fromJson(const QJsonObject &o) {
-    Preferences p; p.caFile=o["caFile"].toString(); p.inputDevice=o["inputDevice"].toString();
+    Preferences p;p.remoteControl=RemoteControlConfig::fromJson(o["remoteControl"].toObject()); p.caFile=o["caFile"].toString(); p.inputDevice=o["inputDevice"].toString();
     const auto keys=o["expansionKeys"].toArray();
     for(int n=0;n<qMin(ExpansionKeyCount,keys.size());++n)p.expansionKeys[n]=ExpansionKey::fromJson(keys[n].toObject());
     p.outputDevice=o["outputDevice"].toString(); p.videoDevice=o["videoDevice"].toString(); p.dnd=o["dnd"].toBool();
@@ -116,6 +116,7 @@ Preferences Preferences::fromJson(const QJsonObject &o) {
     p.videoPortMin=o["videoPortMin"].toInt(11000);p.videoPortMax=o["videoPortMax"].toInt(11198);return p;
 }
 QString Preferences::validate() const {
+    const auto remoteError=remoteControl.validate();if(!remoteError.isEmpty())return remoteError;
     if(expansionKeys.size()!=ExpansionKeyCount)return "Exactly 12 expansion keys are required.";
     for(int n=0;n<expansionKeys.size();++n){const auto error=expansionKeys[n].validate();if(!error.isEmpty())return QString("Key %1: %2").arg(n+1).arg(error);}
     for(const auto &ip:{signallingAddress,mediaAddress})

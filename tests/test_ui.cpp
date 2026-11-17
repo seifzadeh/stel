@@ -5,6 +5,8 @@
 #include "minipbx.h"
 #include "chatwidget.h"
 #include "deskphone.h"
+#include "inlinecallhost.h"
+#include "videoview.h"
 #include <QInputMethodEvent>
 #include <QContextMenuEvent>
 #include <QScrollArea>
@@ -50,7 +52,8 @@ class UiTests:public QObject {
     }
     static bool streams(stel::SipEngine &e){for(const auto &i:e.calls())if(i.rawState==LinphoneCallStreamsRunning)return true;return false;}
     static stel::CallDialog *dialog(stel::MainWindow &w,bool incoming) {
-        for(auto *d:w.findChildren<stel::CallDialog*>())if(d->callInfo().incoming==incoming&&!stel::callHasEnded(d->callInfo().rawState))return d;
+        // These legacy window tests opt into the expanded view explicitly.
+        for(auto *d:w.findChildren<stel::CallDialog*>())if(d->callInfo().incoming==incoming&&!stel::callHasEnded(d->callInfo().rawState)){d->show();return d;}
         return nullptr;
     }
     static QPushButton *button(QWidget &w,const char *name){return w.findChild<QPushButton*>(name);}
@@ -121,6 +124,55 @@ private slots:
         screenshot(window,"stel-about");
     }
     void initTestCase(){if(qEnvironmentVariableIsSet("STEL_VERBOSE_TESTS"))linphone_logging_service_set_log_level(linphone_logging_service_get(),LinphoneLogLevelMessage);}
+    void callsStayOnThePhone_data(){QTest::addColumn<bool>("video");QTest::newRow("audio")<<false;QTest::newRow("video")<<true;}
+    void callsStayOnThePhone(){
+        QFETCH(bool,video);QTemporaryDir tmp;MiniPbx pbx;stel::Store store(tmp.path());stel::Preferences prefs;
+        prefs.inputDevice=stel::dummyMicTone();prefs.outputDevice=stel::dummySpeaker();prefs.videoDevice=stel::dummyCamera();
+        QVector<stel::Account> accounts;for(const auto &user:{"1001","1002"}){auto a=direct(user);a.server=pbx.server();a.registerEnabled=true;a.password="inline-ui-test";accounts<<a;}
+        QString error;QVERIFY2(store.save(accounts,prefs,&error),qPrintable(error));stel::MainWindow window(tmp.path());QVERIFY(window.ready());window.resize(1448,1086);window.show();
+        auto *desk=window.findChild<stel::DeskPhone*>();auto *engine=window.findChild<stel::SipEngine*>();QVERIFY(desk);QVERIFY(engine);
+        QTRY_VERIFY_WITH_TIMEOUT(pbx.registered("1001")&&pbx.registered("1002"),6000);desk->account->setCurrentIndex(desk->account->findData("1001"));desk->target->setText("1002");
+        (video?desk->videoCall:desk->audioCall)->click();QTRY_COMPARE_WITH_TIMEOUT(desk->calls->count(),2,6000);
+        stel::CallDialog *incoming=nullptr;for(auto *view:window.findChildren<stel::CallDialog*>()){QVERIFY(!view->isVisible());if(view->callInfo().incoming)incoming=view;}QVERIFY(incoming);
+        QCOMPARE(desk->pages->currentIndex(),0);QVERIFY(desk->audioCall->isEnabled());QVERIFY(desk->forward->isEnabled());QVERIFY(!desk->attended->isEnabled());QVERIFY(desk->receiveFax->isEnabled());
+        screenshot(window,video?"stel-inline-video-incoming":"stel-inline-incoming");(video?desk->videoCall:desk->audioCall)->click();
+        const auto running=[&]{int n=0;for(const auto &call:engine->calls())n+=call.rawState==LinphoneCallStreamsRunning;return n==2;};QTRY_VERIFY_WITH_TIMEOUT(running(),10000);
+        for(auto *view:window.findChildren<stel::CallDialog*>())QVERIFY(!view->isVisible());
+        QVERIFY(!desk->audioCall->isEnabled());QVERIFY(desk->attended->isEnabled());QVERIFY(!desk->forward->isEnabled());
+        button(window,"deskKey_5")->click();QCOMPARE(desk->dtmfDisplay->text(),QString("DTMF 5"));QCOMPARE(incoming->dtmfText(),QString("5"));
+        desk->mute->click();QTRY_VERIFY(incoming->callInfo().muted);desk->mute->click();QTRY_VERIFY(!incoming->callInfo().muted);
+        desk->hold->click();QTRY_COMPARE(incoming->callInfo().rawState,LinphoneCallPaused);desk->hold->click();QTRY_VERIFY_WITH_TIMEOUT(running(),10000);
+        desk->record->click();QTRY_VERIFY(incoming->callInfo().recording);desk->record->click();QTRY_VERIFY(!incoming->callInfo().recording);
+        desk->openCall->click();QVERIFY(desk->callHost->isVisible());QVERIFY(desk->callHost->findChild<QLabel*>("callMediaDetails"));QVERIFY(!incoming->isVisible());screenshot(window,"stel-inline-details");
+        button(*desk->callHost,"inlineCallBack")->click();QVERIFY(!desk->callHost->isVisible());
+        desk->transfer->click();QVERIFY(desk->callHost->isVisible());auto *route=desk->callHost->findChild<QLineEdit*>("callRouteTarget");QVERIFY(route);QVERIFY(route->isVisible());button(*desk->callHost,"callRouteApply")->click();QVERIFY(desk->callMessage->text().contains("destination"));screenshot(window,"stel-inline-transfer");
+        button(*desk->callHost,"callRouteCancel")->click();QVERIFY(!desk->callHost->isVisible());
+        desk->attended->click();QVERIFY(desk->callHost->isVisible());QVERIFY(desk->callHost->findChild<QComboBox*>("callPeerChoice"));button(*desk->callHost,"inlineCallBack")->click();
+        desk->conference->click();QVERIFY(desk->callHost->isVisible());screenshot(window,"stel-inline-conference");button(*desk->callHost,"inlineCallBack")->click();
+        if(video){
+            QTRY_VERIFY_WITH_TIMEOUT(desk->remoteVideo->property("hasVideoFrame").toBool(),12000);QVERIFY(desk->remoteVideo->isVisible());screenshot(window,"stel-inline-video");
+            QTest::mouseClick(desk->remoteVideo,Qt::LeftButton);QTRY_VERIFY(incoming->isVisible());QTRY_VERIFY_WITH_TIMEOUT(incoming->remoteVideo()->property("hasVideoFrame").toBool(),12000);screenshot(*incoming,"stel-video-expanded");
+            button(*incoming,"callDock")->click();QVERIFY(!incoming->isVisible());QTRY_VERIFY_WITH_TIMEOUT(desk->remoteVideo->property("hasVideoFrame").toBool(),12000);QVERIFY(running());
+            for(int row=0;row<desk->calls->count();++row)if(desk->calls->item(row)->data(Qt::UserRole)!=incoming->callInfo().id)desk->calls->setCurrentRow(row);
+            QTRY_VERIFY_WITH_TIMEOUT(desk->remoteVideo->property("hasVideoFrame").toBool(),12000);
+            for(auto *node=linphone_core_get_calls(engine->native());node;node=node->next){auto *call=static_cast<LinphoneCall*>(node->data);QCOMPARE(linphone_call_get_native_video_window_id(call),linphone_call_get_dir(call)==LinphoneCallOutgoing?reinterpret_cast<void*>(desk->remoteVideo->surfaceId()):LINPHONE_VIDEO_DISPLAY_NONE);}
+            for(int row=0;row<desk->calls->count();++row)if(desk->calls->item(row)->data(Qt::UserRole)==incoming->callInfo().id)desk->calls->setCurrentRow(row);
+            QTRY_VERIFY_WITH_TIMEOUT(desk->remoteVideo->property("hasVideoFrame").toBool(),12000);
+            QTest::mouseClick(desk->remoteVideo,Qt::LeftButton);QTRY_VERIFY(incoming->remoteVideo()->property("hasVideoFrame").toBool());button(*incoming,"callDock")->click();QTRY_VERIFY(desk->remoteVideo->property("hasVideoFrame").toBool());
+        }else QVERIFY(!desk->remoteVideo->isVisible());
+        desk->hangup->click();QTRY_VERIFY_WITH_TIMEOUT(engine->calls().isEmpty(),6000);QVERIFY(window.isVisible());QVERIFY(!desk->callHost->isVisible());QVERIFY(!desk->remoteVideo->isVisible());
+    }
+    void incomingActionsOnThePhone_data(){QTest::addColumn<bool>("forward");QTest::newRow("reject")<<false;QTest::newRow("forward")<<true;}
+    void incomingActionsOnThePhone(){
+        QFETCH(bool,forward);QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({direct("bob")},p));
+        stel::MainWindow window(store.directory());QVERIFY(window.ready());window.show();auto *desk=window.findChild<stel::DeskPhone*>();auto *engine=window.findChild<stel::SipEngine*>();
+        IsolatedSipEngine caller,destination;QVERIFY(caller.start(p,tmp.path()+"/caller",true));QVERIFY(destination.start(p,tmp.path()+"/destination",true));QVERIFY(caller.addAccount(direct("alice")));QVERIFY(destination.addAccount(direct("carol")));
+        QVERIFY(caller.dial("alice",uri(*engine,"bob")));QTRY_VERIFY(desk->audioCall->isEnabled()&&desk->hangup->isEnabled());
+        for(auto *view:window.findChildren<stel::CallDialog*>())QVERIFY(!view->isVisible());
+        if(forward){desk->forward->click();QVERIFY(desk->callHost->isVisible());desk->callHost->findChild<QLineEdit*>("callRouteTarget")->setText(uri(destination,"carol"));button(*desk->callHost,"callRouteApply")->click();QTRY_VERIFY_WITH_TIMEOUT(!destination.calls().isEmpty(),6000);for(const auto &call:destination.calls())destination.hangup(call.id);}
+        else desk->hangup->click();
+        QTRY_VERIFY_WITH_TIMEOUT(engine->calls().isEmpty(),6000);for(const auto &call:caller.calls())caller.hangup(call.id);QTRY_VERIFY(caller.calls().isEmpty());QVERIFY(window.isVisible());
+    }
     void expansionKeysDialAndShowBlf() {
         QTemporaryDir tmp;MiniPbx pbx;stel::Store store(tmp.path());stel::Preferences prefs;
         prefs.inputDevice=stel::dummyMicTone();prefs.outputDevice=stel::dummySpeaker();
@@ -308,7 +360,7 @@ private slots:
     void failedOutgoingCallShowsReason() {
         QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({direct("bob")},p));
         stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();IsolatedSipEngine a;p.dnd=true;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(a.addAccount(direct("alice")));
-        auto *target=w.findChild<QLineEdit*>("dialTarget");target->setText(uri(a,"alice"));QTest::keyClick(target,Qt::Key_Return);QPointer<stel::CallDialog> d=w.findChild<stel::CallDialog*>();QVERIFY(d&&d->isVisible());
+        auto *target=w.findChild<QLineEdit*>("dialTarget");target->setText(uri(a,"alice"));QTest::keyClick(target,Qt::Key_Return);QPointer<stel::CallDialog> d=dialog(w,false);QVERIFY(d&&d->isVisible());
         QTRY_COMPARE_WITH_TIMEOUT(d->callInfo().rawState,LinphoneCallError,5000);QVERIFY(!d->callInfo().error.isEmpty());QVERIFY(d->findChild<QLabel*>("callActionResult")->isVisible());QVERIFY(!button(*d,"callHangup")->isEnabled());QVERIFY(w.isVisible());captureCall(*d,"call-failed");
         QTRY_COMPARE_WITH_TIMEOUT(w.findChild<QListWidget*>("activeCalls")->count(),0,5000);
     }
@@ -338,22 +390,35 @@ private slots:
         QTest::mouseClick(button(*d,"callHangup"),Qt::LeftButton);QTRY_VERIFY_WITH_TIMEOUT(a.calls().isEmpty()&&engine->calls().isEmpty(),6000);
     }
     void consultationActions_data() {
-        QTest::addColumn<bool>("conference");QTest::newRow("attended-transfer")<<false;QTest::newRow("conference")<<true;
+        QTest::addColumn<bool>("conference");QTest::addColumn<bool>("onPhone");
+        QTest::newRow("attended-transfer")<<false<<false;QTest::newRow("conference")<<true<<false;
+        QTest::newRow("phone-attended-transfer")<<false<<true;QTest::newRow("phone-conference")<<true<<true;
     }
     void consultationActions() {
-        QFETCH(bool,conference);QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();
+        QFETCH(bool,conference);QFETCH(bool,onPhone);QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();
         stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({direct("bob")},p));stel::MainWindow w(store.directory());QVERIFY(w.ready());w.show();auto *engine=w.findChild<stel::SipEngine*>();QVERIFY(engine);
         IsolatedSipEngine a,c;QVERIFY(a.start(p,tmp.path()+"/a",true));QVERIFY(c.start(p,tmp.path()+"/c",true));QVERIFY(a.addAccount(direct("alice")));QVERIFY(c.addAccount(direct("charlie")));
         for(auto *e:{&a,&c})connect(e,&stel::SipEngine::callChanged,e,[e](const stel::CallInfo &i){if(i.rawState==LinphoneCallIncomingReceived)QTimer::singleShot(0,e,[e,id=i.id]{e->answer(id,false);});});
         auto *target=w.findChild<QLineEdit*>("dialTarget");target->setText(uri(a,"alice"));QTest::keyClick(target,Qt::Key_Return);QTRY_VERIFY_WITH_TIMEOUT(streams(a)&&streams(*engine),8000);
-        auto *original=dialog(w,false);QVERIFY(original);const auto originalId=original->callInfo().id;
-        QTest::mouseClick(button(*original,"callAddCall"),Qt::LeftButton);QTRY_COMPARE_WITH_TIMEOUT(original->callInfo().rawState,LinphoneCallPaused,6000);QTRY_VERIFY_WITH_TIMEOUT(target->text().isEmpty(),3000);
+        auto *desk=w.findChild<stel::DeskPhone*>();stel::CallDialog *original=nullptr;
+        for(auto *view:w.findChildren<stel::CallDialog*>())if(!view->callInfo().incoming)original=view;QVERIFY(original);
+        if(!onPhone)original->show();const auto originalId=original->callInfo().id;
+        if(onPhone)desk->addCall->click();else button(*original,"callAddCall")->click();QTRY_COMPARE_WITH_TIMEOUT(original->callInfo().rawState,LinphoneCallPaused,6000);QTRY_VERIFY_WITH_TIMEOUT(target->text().isEmpty(),3000);
         target->setText(uri(c,"charlie"));QTest::keyClick(target,Qt::Key_Return);QTRY_VERIFY_WITH_TIMEOUT(streams(c)&&streams(*engine),8000);
-        QTest::mouseClick(button(*original,conference?"callConference":"callAttendedTransfer"),Qt::LeftButton);
-        auto *scroll=original->findChild<QScrollArea*>();auto *panel=original->findChild<QWidget*>("callPeerPanel");
-        auto panelVisible=[&]{return scroll->viewport()->rect().contains(QRect(panel->mapTo(scroll->viewport(),QPoint(0,0)),panel->size()));};QTRY_VERIFY_WITH_TIMEOUT(panelVisible(),2000);
-        auto *peers=original->findChild<QComboBox*>("callPeerChoice");QCOMPARE(peers->count(),1);QVERIFY(peers->currentData().toString()!=originalId);QVERIFY(button(*original,"callPeerApply")->isEnabled());captureCall(*original,conference?"call-conference-choice":"call-attended-choice");
-        QTest::mouseClick(button(*original,"callPeerApply"),Qt::LeftButton);
+        QWidget *controls=original;
+        if(onPhone){
+            for(int row=0;row<desk->calls->count();++row)if(desk->calls->item(row)->data(Qt::UserRole)==originalId)desk->calls->setCurrentRow(row);
+            (conference?desk->conference:desk->attended)->click();controls=desk->callHost;
+            QVERIFY(desk->callHost->isVisible());QVERIFY(!original->isVisible());
+        }else{
+            // Add Call returns to the phone; explicitly reopen the optional window.
+            original->show();button(*original,conference?"callConference":"callAttendedTransfer")->click();
+            auto *scroll=original->findChild<QScrollArea*>();auto *panel=original->findChild<QWidget*>("callPeerPanel");
+            auto panelVisible=[&]{return scroll->viewport()->rect().contains(QRect(panel->mapTo(scroll->viewport(),QPoint(0,0)),panel->size()));};QTRY_VERIFY_WITH_TIMEOUT(panelVisible(),2000);
+        }
+        auto *peers=controls->findChild<QComboBox*>("callPeerChoice");QVERIFY(peers);QCOMPARE(peers->count(),1);QVERIFY(peers->currentData().toString()!=originalId);QVERIFY(button(*controls,"callPeerApply")->isEnabled());
+        if(!onPhone)captureCall(*original,conference?"call-conference-choice":"call-attended-choice");
+        button(*controls,"callPeerApply")->click();
         if(conference) {
             auto joined=[&]{int n=0;for(const auto &i:engine->calls())n+=i.inConference&&i.conferenceParticipants==2&&i.rawState==LinphoneCallStreamsRunning;return n==2&&streams(a)&&streams(c);};
             QTRY_VERIFY_WITH_TIMEOUT(joined(),10000);captureCall(*original,"call-conference");

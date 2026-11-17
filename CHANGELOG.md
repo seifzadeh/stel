@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.15.0 — 2026-11-17
+
+- Add Settings → Remote API, with token authentication, client IP/CIDR controls,
+  local-only defaults and optional HTTPS using the existing SDK TLS backend.
+- Support Yealink HTTP Action URI paths and common call commands: dial, answer,
+  hang up, hold, mute, blind/attended transfer, conference and expansion keys.
+- Add a JSON API for accounts/registration, call controls, devices/codecs,
+  messages, contacts, history, BLF status, main-screen capture and event polling.
+- Upload text, PDF, TXT or images, prepare A4 pages in the background, send or
+  receive T.38/G.711 fax and download completed fax files through the API.
+- Cover authentication, HTTP parsing, HTTPS, real SIP call operations, BLF,
+  Persian messages, document conversion and two-way fax in integration tests.
+
+## 0.14.0 — 2026-11-17
+
+- Keep incoming and outgoing calls on the main phone display. Answer, reject,
+  hold, mute, record and send DTMF without opening a separate window.
+- Add Forward, Attended transfer and Fax controls to the LCD, with inline
+  destination, conference selection and call-details panels.
+- Show remote video and a local preview in the LCD corner. Click to expand,
+  then use Return to phone to continue the call on the main screen.
+- Keep disconnect confirmation when closing an expanded live-call window.
+- Cover inline voice/video calls, real forwarding, attended transfer, conference,
+  line selection and repeated video expansion with SIP and live media tests.
+
 ## 0.13.0 — 2026-11-16
 
 - Replace the five navigation shortcuts under the display with 12 configurable

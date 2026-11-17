@@ -1,0 +1,185 @@
+{
+    "captured_at": "2026-11-17T06:56:25Z",
+    "fixture": "Disposable loopback PBX, two registered demo accounts, dummy microphone and camera; real SIP messages, an Alert-Info page and a two-page T.38 fax.",
+    "images": [
+        {
+            "file": "incoming-call.png",
+            "height": 1086,
+            "sha256": "1bb904327528ae64eef82755f1d5a5333ff24b2ab48ee32f8427cf132a1bef0a",
+            "width": 1448
+        },
+        {
+            "file": "call.png",
+            "height": 1086,
+            "sha256": "ed6b8db43dcee05f40177ac9264310d1f2831ce042b31df5ba99bc7cda877eab",
+            "width": 1448
+        },
+        {
+            "file": "call-transfer.png",
+            "height": 1086,
+            "sha256": "fc133b0af63926b06b584c054ce2c0e905422efa50bdee94a46583fa50bc6ff8",
+            "width": 1448
+        },
+        {
+            "file": "call-conference.png",
+            "height": 1086,
+            "sha256": "9d8cca5db1cab46e1bfd4246e5c87af2801770b46222f38114ee94aa00eeedf9",
+            "width": 1448
+        },
+        {
+            "file": "call-details.png",
+            "height": 1086,
+            "sha256": "0b75194414f9e175733a543f888be00d0a44d5a9a2b13a9d40ada249209493cf",
+            "width": 1448
+        },
+        {
+            "file": "video-call.png",
+            "height": 1086,
+            "sha256": "e5dfe5ae0ed1d0b395577fbc2f56ad1ee793869b3ef0c24ae04900871259192d",
+            "width": 1448
+        },
+        {
+            "file": "video-expanded.png",
+            "height": 820,
+            "sha256": "9da437b207f4d8207db0ce20d28d5c913562368f05d67e87ca004c6d1211845d",
+            "width": 640
+        },
+        {
+            "file": "messages.png",
+            "height": 1086,
+            "sha256": "7911cb6a7ab428e450a520cdc46859ee83eb971ac11b03cfca1fab8d93abcff4",
+            "width": 1448
+        },
+        {
+            "file": "fax-preview.png",
+            "height": 1160,
+            "sha256": "b0d03e6a3bc2e310149841ac0d5ede04e5c804bcc690f8e5d58c46761282200a",
+            "width": 800
+        },
+        {
+            "file": "fax.png",
+            "height": 1086,
+            "sha256": "114380c13cbb69851563439dd8c27e50f23440482546d54692688e0471056a2c",
+            "width": 1448
+        },
+        {
+            "file": "fax-outbox.png",
+            "height": 1086,
+            "sha256": "b94d2c7377e5b723483b70e834d81b75af27d733e8784e9436ed3fd7330966aa",
+            "width": 1448
+        },
+        {
+            "file": "fax-send.png",
+            "height": 1086,
+            "sha256": "7bdc87a2681c3b069cb906c997f53e9a93485a84b1e19a416722e9d7514abe32",
+            "width": 1448
+        },
+        {
+            "file": "main-window.png",
+            "height": 1086,
+            "sha256": "9e5637c2567ce650776df81b0023e4aeee8932367d3f0f9e3079ca503a2de2ba",
+            "width": 1448
+        },
+        {
+            "file": "paging.png",
+            "height": 1086,
+            "sha256": "e54e9938d440e13c97924f7f4402c0aa64a04358210c1cbd70eb22166fb0d9bd",
+            "width": 1448
+        },
+        {
+            "file": "paging-call.png",
+            "height": 1086,
+            "sha256": "548be78d6d506e82e416d0c792b384f991946050a54fcc9556212a62dc7b9606",
+            "width": 1448
+        },
+        {
+            "file": "main-idle.png",
+            "height": 1086,
+            "sha256": "16c903ff391b04b74266ed80c204ed457c02469b665eff7433ef01ff4c041a73",
+            "width": 1448
+        },
+        {
+            "file": "contacts.png",
+            "height": 1086,
+            "sha256": "20a53ceb6c7bcd5a8114934ce8b93c4405a478d3e615d741175a24bd55bc7fb3",
+            "width": 1448
+        },
+        {
+            "file": "history.png",
+            "height": 1086,
+            "sha256": "56813201a9896d1a4b2203948b80e5b080ba5f4138a76617b39cae91ca46af9d",
+            "width": 1448
+        },
+        {
+            "file": "accounts.png",
+            "height": 900,
+            "sha256": "0cd83f3befbc83aa63b7e779611dd548e22d6b06161d63c244211d9d5a9651ed",
+            "width": 1080
+        },
+        {
+            "file": "codecs.png",
+            "height": 845,
+            "sha256": "247c294b668a00752a628d0f8e7da2777224d1d589a89ff7f6a90cd46d34374f",
+            "width": 1080
+        },
+        {
+            "file": "video-codecs.png",
+            "height": 845,
+            "sha256": "4653a1f9068f888e78721007788ece59f7fb3506d6e6d18b78a52fc0c3fac7f0",
+            "width": 1080
+        },
+        {
+            "file": "network.png",
+            "height": 845,
+            "sha256": "61c30e02035eb001dfbf5bf8ca655cd65e942803d2acf70f15e03668391a59c5",
+            "width": 1080
+        },
+        {
+            "file": "security.png",
+            "height": 845,
+            "sha256": "e6ad3398a6343cb04c22def27eed729807db4724429924ab26e29d378714e6c5",
+            "width": 1080
+        },
+        {
+            "file": "expansion.png",
+            "height": 845,
+            "sha256": "af3d2bf4030adb5b0926409e3e7fea6b4273977482a7a05fccdf556a7e7e4872",
+            "width": 1080
+        },
+        {
+            "file": "about.png",
+            "height": 900,
+            "sha256": "535646cf4452568450eca384f74ac15fa4e2743c00da72fce3371cc82d4ad092",
+            "width": 1080
+        },
+        {
+            "file": "account-security.png",
+            "height": 900,
+            "sha256": "72d1c9bafc7bd1f10a5ee122cb3a299d778c6b0b956edb07586b81f23c78c74c",
+            "width": 1080
+        },
+        {
+            "file": "account-nat.png",
+            "height": 900,
+            "sha256": "1a859f0d62780b41b058284329ecccdc035781da662495a51cc513523f0420ee",
+            "width": 1080
+        },
+        {
+            "file": "account-forwarding.png",
+            "height": 900,
+            "sha256": "fd2092b4da0d8b8c23a4711ee42150919332d483fbf64e823735aa0441bc5ce2",
+            "width": 1080
+        },
+        {
+            "file": "account-paging.png",
+            "height": 900,
+            "sha256": "5c9020c11e4cb6314077f2b42801286bf920ec25115699c86c7026b02b14a2e9",
+            "width": 1080
+        }
+    ],
+    "liblinphone": "5.3.105",
+    "platform": "Debian GNU/Linux 13 (trixie)",
+    "qt": "5.15.15",
+    "ui_source_commit": "871512b52b33b3826cdfbfbaeb5ba4e9ac4cb169+working-tree",
+    "version": "0.14.0"
+}

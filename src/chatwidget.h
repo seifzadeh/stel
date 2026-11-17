@@ -16,6 +16,8 @@ public:
     ChatWidget(SipEngine &,Store &,QWidget *parent=nullptr);
     void setAccounts(const QVector<Account> &);
     int unreadCount() const;
+    QVector<MessageInfo> messages() const {return messages_;}
+    bool markMessageRead(const QString &,QString *error=nullptr);
     void setDeskMode();
 signals:
     void unreadCountChanged(int count);

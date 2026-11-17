@@ -22,13 +22,13 @@ workflow run or repository-setting change was made during local preparation.
    cd /home/dev/codes/stel/repo
    git status --short
    git add .
-   git commit -m "Release Stel 0.13.0"
+   git commit -m "Release Stel 0.15.0"
    git push origin main
    ```
 
 The **Build, test and release** workflow starts automatically. It builds/tests
 Linux and Windows and checks the standalone applications. Only when Linux, Windows and RPM installation tests
-succeed does it create the `v0.13.0` tag and GitHub Release for that commit. A draft
+succeed does it create the `v0.15.0` tag and GitHub Release for that commit. A draft
 is used while uploading; it is published after all assets upload successfully.
 The **Website** workflow publishes the static site to GitHub Pages separately.
 The first SDK build on Windows takes longer; later runs reuse pinned dependency
@@ -37,10 +37,10 @@ caches. Workflow logs are the authority on the first Windows build's outcome.
 ## Next versions
 
 ```sh
-python3 scripts/release.py bump 0.13.1
-# Add a "## 0.13.1" section to CHANGELOG.md and describe the changes.
+python3 scripts/release.py bump 0.15.1
+# Add a "## 0.15.1" section to CHANGELOG.md and describe the changes.
 git add .
-git commit -m "Release Stel 0.13.1"
+git commit -m "Release Stel 0.15.1"
 git push origin main
 ```
 

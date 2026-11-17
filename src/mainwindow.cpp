@@ -1,5 +1,10 @@
 #include "mainwindow.h"
+#include "remotecontrol.h"
+#include "remotecontrolwidget.h"
+#include <QBuffer>
 #include "deskphone.h"
+#include "inlinecallhost.h"
+#include <QKeyEvent>
 #include <QShortcut>
 #include "calldialog.h"
 #include "videoview.h"
@@ -45,7 +50,7 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
     desk_=new DeskPhone;setCentralWidget(desk_);
     accountBox_=desk_->account;target_=desk_->target;calls_=desk_->calls;detail_=desk_->detail;status_=desk_->status;openCall_=desk_->openCall;tabs_=desk_->pages;
     auto *settingsButton=desk_->settings;
-    auto *dnd=new QCheckBox("Do not disturb",this);dnd->hide();
+    auto *dnd=new QCheckBox("Do not disturb",this);dnd->setObjectName("globalDnd");dnd->hide();
     chat_=new ChatWidget(engine_,store_);chat_->setDeskMode();tabs_->addTab(chat_,"Messages");
     auto *faxPage=new QWidget;auto *faxLayout=new QVBoxLayout(faxPage);faxLayout->setContentsMargins(18,10,18,10);auto *faxTitle=new QLabel("Fax");faxTitle->setStyleSheet("color:white;font-size:28px;font-weight:bold;");faxLayout->addWidget(faxTitle);auto *faxHint=new QLabel("PDF, text and images · standard A4 pages\nT.38 or G.711 pass-through, chosen for each fax.");faxHint->setStyleSheet("color:#d6e9ff;font-size:15px;");faxHint->setWordWrap(true);faxLayout->addWidget(faxHint);auto *faxSummary=new QLabel;faxSummary->setObjectName("deskFaxSummary");faxSummary->setStyleSheet("color:#e9f4ff;font-size:16px;");faxLayout->addWidget(faxSummary);auto *faxActions=new QHBoxLayout;for(int n=0;n<3;++n){auto *button=new QPushButton(QStringList{"Send Fax","Inbox","Outbox"}[n]);button->setStyleSheet("background:#164c81;color:white;border:1px solid #479de7;padding:8px;");faxActions->addWidget(button);connect(button,&QPushButton::clicked,this,[this,n]{if(auto *tab=fax_->findChild<QPushButton*>("faxDeskTab"+QString::number(n)))tab->click();});}faxLayout->addLayout(faxActions);tabs_->addTab(faxPage,"Fax");tabs_->addTab(createContacts(),"Contacts");tabs_->addTab(createHistory(),"Recent calls");
     fax_=new FaxWidget(engine_,desk_,true);desk_->dockFax(fax_);
@@ -59,9 +64,11 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
     auto *eventShortcut=new QShortcut(QKeySequence("Ctrl+L"),this);connect(eventShortcut,&QShortcut::activated,events,&QDialog::show);
     connect(target_,&QLineEdit::returnPressed,this,[this]{dial(false);});
     connect(calls_,&QListWidget::currentRowChanged,this,[this]{updateControls();});
-    connect(calls_,&QListWidget::itemActivated,this,[this](QListWidgetItem *item){showCall(item->data(Qt::UserRole).toString());});
-    connect(openCall_,&QPushButton::clicked,this,[this]{showCall(selectedCall());});
-    connect(desk_,&DeskPhone::digitPressed,this,[this](QChar digit){const auto id=selectedCall();const auto call=callCache_.value(id);if(!id.isEmpty()&&(call.rawState==LinphoneCallStreamsRunning||call.rawState==LinphoneCallConnected)){if(auto dialog=callDialogs_.value(id)){const auto name="callDtmf_"+(digit=='*'?QString("star"):digit=='#'?QString("hash"):QString(digit));if(auto *button=dialog->findChild<QPushButton*>(name))button->click();}}else{target_->insert(digit);tabs_->setCurrentIndex(0);}});
+    connect(calls_,&QListWidget::itemActivated,this,[this](QListWidgetItem *){tabs_->setCurrentIndex(0);updateControls();});
+    connect(openCall_,&QPushButton::clicked,this,[this]{mainCallAction("details");});
+    connect(desk_,&DeskPhone::digitPressed,this,[this](QChar digit){if(auto dialog=callDialogs_.value(selectedCall())){if(dialog->canSendDtmf()){dialog->sendDtmf(digit);updateControls();}}else{target_->insert(digit);tabs_->setCurrentIndex(0);}});
+    connect(desk_->remoteVideo,&VideoView::clicked,this,[this]{showCall(selectedCall());});
+    connect(desk_->previewVideo,&VideoView::clicked,this,[this]{showCall(selectedCall());});
     connect(desk_,&DeskPhone::expansionConfigureRequested,this,&MainWindow::configureExpansion);
     connect(desk_,&DeskPhone::expansionPressed,this,[this](int index){
         const auto key=prefs_.expansionKeys.value(index);if(key.type=="disabled"){configureExpansion(index);return;}
@@ -70,16 +77,19 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
         accountBox_->setCurrentIndex(account);target_->setText(key.target);tabs_->setCurrentIndex(0);dial(false);
     });
     connect(&engine_,&SipEngine::blfChanged,desk_,&DeskPhone::setExpansionState);
-    connect(desk_->audioCall,&QPushButton::clicked,this,[this]{const auto call=callCache_.value(selectedCall());if(call.incoming&&(call.rawState==LinphoneCallIncomingReceived||call.rawState==LinphoneCallIncomingEarlyMedia))engine_.answer(call.id,false);else dial(false);});
-    connect(desk_->videoCall,&QPushButton::clicked,this,[this]{dial(true);});
-    connect(desk_->hangup,&QPushButton::clicked,this,[this]{if(!selectedCall().isEmpty())engine_.hangup(selectedCall());});
-    connect(desk_->hold,&QPushButton::clicked,this,[this]{const auto call=callCache_.value(selectedCall());if(!call.id.isEmpty())engine_.hold(call.id,call.rawState!=LinphoneCallPaused&&call.rawState!=LinphoneCallPausing);});
-    connect(desk_->mute,&QPushButton::clicked,this,[this]{const auto call=callCache_.value(selectedCall());if(!call.id.isEmpty())engine_.muteCall(call.id,!call.muted);});
-    const auto action=[this](const char *name){const auto id=selectedCall();showCall(id);if(auto dialog=callDialogs_.value(id))if(auto *button=dialog->findChild<QPushButton*>(name))button->click();};
+    connect(desk_->audioCall,&QPushButton::clicked,this,[this]{const auto call=callCache_.value(selectedCall());if(call.incoming&&(call.rawState==LinphoneCallIncomingReceived||call.rawState==LinphoneCallIncomingEarlyMedia))mainCallAction("callAnswer");else dial(false);});
+    connect(desk_->videoCall,&QPushButton::clicked,this,[this]{const auto call=callCache_.value(selectedCall());if(call.incoming&&(call.rawState==LinphoneCallIncomingReceived||call.rawState==LinphoneCallIncomingEarlyMedia))mainCallAction("callAnswerVideo");else if(!call.id.isEmpty()&&call.video)showCall(call.id);else dial(true);});
+    connect(desk_->hangup,&QPushButton::clicked,this,[this]{mainCallAction("callHangup");});
+    connect(desk_->hold,&QPushButton::clicked,this,[this]{mainCallAction("callHold");});
+    connect(desk_->mute,&QPushButton::clicked,this,[this]{mainCallAction("callMute");});
+    const auto action=[this](const char *name){mainCallAction(name);};
     connect(desk_->transfer,&QPushButton::clicked,this,[action]{action("callTransfer");});
     connect(desk_->conference,&QPushButton::clicked,this,[action]{action("callConference");});
     connect(desk_->record,&QPushButton::clicked,this,[action]{action("callRecord");});
-    connect(desk_->addCall,&QPushButton::clicked,this,[this]{tabs_->setCurrentIndex(0);calls_->clearSelection();calls_->setCurrentRow(-1);updateControls();target_->clear();target_->setFocus();});
+    connect(desk_->forward,&QPushButton::clicked,this,[action]{action("callForward");});
+    connect(desk_->attended,&QPushButton::clicked,this,[action]{action("callAttendedTransfer");});
+    connect(desk_->receiveFax,&QPushButton::clicked,this,[action]{action("callFax");});
+    connect(desk_->addCall,&QPushButton::clicked,this,[this]{if(callDialogs_.value(selectedCall()))mainCallAction("callAddCall");else{tabs_->setCurrentIndex(0);target_->clear();target_->setFocus();}});
     connect(desk_->redial,&QPushButton::clicked,this,[this]{if(history_->count()){target_->setText(history_->item(0)->data(Qt::UserRole).toString());dial(false);}});
     connect(desk_->speaker,&QPushButton::clicked,this,[this]{
         auto *menu=new QMenu(this);menu->setAttribute(Qt::WA_DeleteOnClose);const auto devices=engine_.soundDevices(false,true);
@@ -95,6 +105,7 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
     connect(&engine_,&SipEngine::faxChanged,this,[this]{updateControls();});
     connect(&engine_,&SipEngine::callFinished,this,[this](const CallInfo &i){
         const auto old=callCache_.take(i.id);
+        lastCallMessage_=(old.rawState==LinphoneCallError?old.error:QString("Call ended · ")+(old.remoteName.isEmpty()?old.remote:old.remoteName));
         if(auto dialog=callDialogs_.value(i.id))dialog->finishCall(old.id.isEmpty()?i:old);
         store_.appendHistory({{"at",QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},{"remote",i.remote},{"account",i.accountId},
             {"incoming",i.incoming},{"paging",i.paging},{"pagingAutoAnswered",i.pagingAutoAnswered},{"duration",qMax(i.duration,old.duration)},{"state",old.state},{"video",old.video}});
@@ -113,6 +124,12 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
         auto runtime=a;if(a.credentialsRequired)runtime.registerEnabled=false;
         engine_.addAccount(runtime);if(a.credentialsRequired)accountStates_[a.id]="CredentialsRequired";
     }
+    remoteControl_=new RemoteControlServer(engine_,store_,accounts_,prefs_,*chat_,this);
+    remoteControl_->setScreenshotProvider([this]{QByteArray bytes;QBuffer buffer(&bytes);buffer.open(QIODevice::WriteOnly);grab().save(&buffer,"JPG",85);return bytes;});
+    remoteControl_->setSelectionProviders([this]{return selectedCall();},[this]{return accountBox_->currentData().toString();});
+    remoteControl_->setConfigurationGuard([this]{return settingsValid_&&!closing_&&settingsDialog_&&!settingsDialog_->isVisible();});
+    connect(remoteControl_,&RemoteControlServer::resourceChanged,this,&MainWindow::reloadApiConfiguration);
+    if(ready_&&settingsValid_){QString error;if(!remoteControl_->configure(prefs_.remoteControl,&error))appendLog("Remote API: "+error);}
     settingsDialog_=new QDialog(this);settingsDialog_->setObjectName("settingsDialog");settingsDialog_->setWindowTitle("Stel • Settings");
     settingsDialog_->setWindowFlag(Qt::WindowContextHelpButtonHint,false);settingsDialog_->resize(1080,850);
     auto *settingsLayout=new QVBoxLayout(settingsDialog_);settingsLayout->setContentsMargins(10,10,10,10);settingsLayout->addWidget(createSettings());settingsLayout->addWidget(dnd);dnd->show();
@@ -164,6 +181,7 @@ QWidget *MainWindow::createSettings() {
     settings_=new SettingsWidget(engine_,accounts_,prefs_,store_,settingsValid_,settingsDialog_);
     connect(settings_,&SettingsWidget::accountsChanged,this,&MainWindow::rebuildAccounts);
     connect(settings_,&SettingsWidget::expansionChanged,this,&MainWindow::refreshExpansion);
+    if(remoteControl_){auto *pages=settings_->findChild<QTabWidget*>("settingsPages");pages->addTab(new RemoteControlWidget(*remoteControl_,accounts_,prefs_,store_,settingsValid_,settings_),navigationIcon(NavigationIcon::Network),"Remote API");styleNavigationTabs(pages,NavigationLevel::Settings);}
     return settings_;
 }
 void MainWindow::showSettings(){if(closing_)return;settings_->openAccounts();settingsDialog_->show();settingsDialog_->raise();settingsDialog_->activateWindow();}
@@ -178,7 +196,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
     question.setObjectName("confirmExit");question.setDefaultButton(QMessageBox::Cancel);question.setEscapeButton(QMessageBox::Cancel);
     const bool confirmed=question.exec()==QMessageBox::Yes;confirmingExit_=false;
     if(!confirmed){event->ignore();return;}
-    closing_=true;settingsDialog_->hide();for(auto dialog:callDialogs_)if(dialog)dialog->hide();if(tray_)tray_->hide();
+    closing_=true;if(remoteControl_)remoteControl_->stop();settingsDialog_->hide();for(auto dialog:callDialogs_)if(dialog)dialog->hide();if(tray_)tray_->hide();
     setEnabled(false);engine_.shutdown();callCache_.clear();accountStates_.clear();calls_->clear();
     for(auto &a:accounts_){a.password.clear();a.keyPassword.clear();a.turnPassword.clear();}
     event->accept();
@@ -197,16 +215,54 @@ void MainWindow::rebuildAccounts(){
     updateControls();
 }
 void MainWindow::dial(bool video){
-    if(!engine_.dial(accountBox_->currentData().toString(),target_->text(),video))QMessageBox::warning(this,"Call",engine_.lastError());
+    lastCallMessage_.clear();desk_->callMessage->clear();
+    tabs_->setCurrentIndex(0);
+    if(!engine_.dial(accountBox_->currentData().toString(),target_->text(),video)){lastCallMessage_=engine_.lastError();desk_->callMessage->setText(lastCallMessage_);desk_->callMessage->setToolTip(lastCallMessage_);desk_->callMessage->show();}
 
 }
 MainWindow::~MainWindow() {
-    closing_=true;engine_.shutdown();
+    closing_=true;if(remoteControl_)remoteControl_->stop();engine_.shutdown();
     const auto dialogs=callDialogs_;callDialogs_.clear();
     for(auto dialog:dialogs)if(dialog){disconnect(dialog,nullptr,this,nullptr);delete dialog;}
 }
+void MainWindow::reloadApiConfiguration(const QString &resource){
+    if(resource=="configuration"){rebuildAccounts();refreshExpansion();
+        if(settingsDialog_&&!settingsDialog_->isVisible()){auto *old=settings_;auto *layout=settingsDialog_->layout();const int index=layout->indexOf(old);layout->removeWidget(old);static_cast<QVBoxLayout*>(layout)->insertWidget(index,createSettings());old->deleteLater();}
+    }
+    if(resource=="contacts")refreshContacts();
+    if(resource=="dnd"||resource=="configuration")if(auto *dnd=findChild<QCheckBox*>("globalDnd")){const QSignalBlocker blocker(dnd);dnd->setChecked(prefs_.dnd);}
+    updateControls();
+}
 void MainWindow::showCall(const QString &id) {
-    if(auto dialog=callDialogs_.value(id)){dialog->showNormal();dialog->raise();dialog->activateWindow();}
+    if(auto dialog=callDialogs_.value(id)){dialog->setInlineHost(nullptr);dialog->showNormal();dialog->raise();dialog->activateWindow();updateMainVideo(callCache_.value(selectedCall()));}
+}
+void MainWindow::mainCallAction(const char *name){
+    auto dialog=callDialogs_.value(selectedCall());if(!dialog)return;
+    if(dialog->isVisible())dialog->hide();
+    tabs_->setCurrentIndex(0);dialog->setInlineHost(desk_->callHost);
+    if(QByteArray(name)=="details")dialog->showInlineDetails();
+    else if(auto *button=dialog->findChild<QPushButton*>(name))button->click();
+    updateControls();
+}
+void MainWindow::keyPressEvent(QKeyEvent *event){
+    const auto text=event->text();auto dialog=callDialogs_.value(selectedCall());
+    if(text.size()==1&&QString("0123456789*#").contains(text[0])&&dialog&&dialog->canSendDtmf()&&
+       !qobject_cast<QLineEdit*>(focusWidget())&&!qobject_cast<QPlainTextEdit*>(focusWidget())){dialog->sendDtmf(text[0]);updateControls();event->accept();return;}
+    QMainWindow::keyPressEvent(event);
+}
+void MainWindow::updateMainVideo(const CallInfo &call){
+    const auto none=reinterpret_cast<quintptr>(LINPHONE_VIDEO_DISPLAY_NONE);
+    if(videoCallId_!=call.id){
+        if(!videoCallId_.isEmpty()){auto previous=callDialogs_.value(videoCallId_);if(!previous||!previous->isVisible())engine_.setCallVideoWindows(videoCallId_,none,none);}
+        desk_->remoteVideo->setFrameSource(nullptr);desk_->previewVideo->setFrameSource(nullptr);desk_->remoteVideo->clearFrame();desk_->previewVideo->clearFrame();inlineVideoId_.clear();videoCallId_=call.id;
+    }
+    if(call.id.isEmpty()||!call.video||callHasEnded(call.rawState)){
+        if(!inlineVideoId_.isEmpty()){engine_.setCallVideoWindows(inlineVideoId_,none,none);inlineVideoId_.clear();desk_->remoteVideo->setFrameSource(nullptr);desk_->previewVideo->setFrameSource(nullptr);desk_->remoteVideo->clearFrame();desk_->previewVideo->clearFrame();}
+        return;
+    }
+    auto dialog=callDialogs_.value(call.id);if(!dialog)return;
+    if(dialog->isVisible()){desk_->remoteVideo->setFrameSource(dialog->remoteVideo());desk_->previewVideo->setFrameSource(dialog->previewVideo());inlineVideoId_.clear();}
+    else if(inlineVideoId_!=call.id){desk_->remoteVideo->setFrameSource(nullptr);desk_->previewVideo->setFrameSource(nullptr);engine_.setCallVideoWindows(call.id,desk_->remoteVideo->surfaceId(),desk_->previewVideo->surfaceId());inlineVideoId_=call.id;}
 }
 void MainWindow::refreshCallDialogs() {
     const auto peers=engine_.calls();for(auto dialog:callDialogs_)if(dialog)dialog->refreshPeers(peers);
@@ -214,7 +270,7 @@ void MainWindow::refreshCallDialogs() {
 void MainWindow::updateCall(const CallInfo &i){
     // Released is an SDK cleanup notification; retain the real final state for history.
     if(i.rawState==LinphoneCallReleased||closing_)return;
-    const bool first=!callCache_.contains(i.id);const auto old=callCache_.value(i.id);callCache_[i.id]=i;
+    const bool first=!callCache_.contains(i.id);const auto old=callCache_.value(i.id);callCache_[i.id]=i;if(first)lastCallMessage_.clear();
     QListWidgetItem *item=nullptr;for(int row=0;row<calls_->count();++row)if(calls_->item(row)->data(Qt::UserRole).toString()==i.id)item=calls_->item(row);
     if(!item){item=new QListWidgetItem(calls_);item->setData(Qt::UserRole,i.id);calls_->setCurrentItem(item);}
     QString localAccount=i.accountName,accountDetails=i.accountName,transport;
@@ -226,28 +282,40 @@ void MainWindow::updateCall(const CallInfo &i){
     auto dialog=callDialogs_.value(i.id);
     if(!dialog&&first){
         dialog=new CallDialog(engine_,i,this);callDialogs_[i.id]=dialog;
+        dialog->enableDocking();
+        connect(dialog,&CallDialog::expandRequested,this,[this,id=i.id]{showCall(id);});
+        connect(dialog,&CallDialog::viewChanged,this,[this]{QTimer::singleShot(0,this,[this]{if(!closing_)updateControls();});});
+        connect(dialog,&CallDialog::dockRequested,this,[this,id=i.id]{for(int row=0;row<calls_->count();++row)if(calls_->item(row)->data(Qt::UserRole)==id)calls_->setCurrentRow(row);tabs_->setCurrentIndex(0);showNormal();raise();updateControls();});
+        connect(dialog,&CallDialog::actionMessageChanged,this,[this,id=i.id](const QString &message){if(id==selectedCall()){desk_->callMessage->setText(message);desk_->callMessage->setToolTip(message);desk_->callMessage->setVisible(!message.isEmpty()&&tabs_->currentIndex()==0);}});
         connect(dialog,&CallDialog::faxRequested,this,[this](const QString &id){for(const auto &call:engine_.calls())if(call.id==id){if(fax_->receiveCall(call))tabs_->setCurrentIndex(2);break;}});
         connect(dialog,&QObject::destroyed,this,[this,id=i.id]{callDialogs_.remove(id);});
-        connect(dialog,&CallDialog::newCallRequested,this,[this](const QString &accountId){
-            accountBox_->setCurrentIndex(accountBox_->findData(accountId));tabs_->setCurrentIndex(0);showNormal();raise();activateWindow();target_->clear();target_->setFocus();
+        connect(dialog,&CallDialog::newCallRequested,this,[this,dialog](const QString &accountId){
+            if(dialog)dialog->hide();
+            accountBox_->setCurrentIndex(accountBox_->findData(accountId));tabs_->setCurrentIndex(0);calls_->clearSelection();calls_->setCurrentRow(-1);showNormal();raise();activateWindow();updateControls();target_->clear();target_->setFocus();
         });
         const auto screen=QApplication::primaryScreen();if(screen){const auto area=screen->availableGeometry();const int offset=24*((callDialogs_.size()-1)%5);dialog->move(qBound(area.left(),frameGeometry().center().x()-dialog->width()/2+offset,area.right()-dialog->width()),qBound(area.top(),area.center().y()-dialog->height()/2+offset,area.bottom()-dialog->height()));}
     }
-    if(dialog){dialog->updateCall(i,accountDetails,transport);if(first)showCall(i.id);}
-    if(first && i.incoming){QApplication::alert(dialog?static_cast<QWidget*>(dialog):this);if(tray_)tray_->showMessage(i.paging?"Incoming page":"Incoming call",i.remote,QSystemTrayIcon::Information,10000);if(!i.paging)QApplication::beep();}
+    if(dialog)dialog->updateCall(i,accountDetails,transport);
+    if(first){bool faxCall=false;for(const auto &fax:engine_.faxes())faxCall|=fax.callId==i.id;if(i.incoming||!faxCall)tabs_->setCurrentIndex(0);showNormal();raise();activateWindow();}
+    if(first && i.incoming){QApplication::alert(this);if(tray_)tray_->showMessage(i.paging?"Incoming page":"Incoming call",i.remote,QSystemTrayIcon::Information,10000);if(!i.paging)QApplication::beep();}
     updateControls();refreshCallDialogs();
 }
 void MainWindow::updateControls(){
     if(!openCall_||!detail_)return;
     const auto id=selectedCall();const auto i=callCache_.value(id);openCall_->setEnabled(!id.isEmpty()&&callDialogs_.value(id));
-    detail_->setText(id.isEmpty()?"Ready when you are. Incoming and outgoing calls open their own window.":i.remote+"\n"+callStateLabel(i.rawState)+"  •  Media: "+(i.encryption.isEmpty()?"negotiating":i.encryption)+"  •  "+QString::number(i.duration)+"s"+(i.audioCodec.isEmpty()?QString():"\nAudio: "+i.audioCodec)+(i.videoCodec.isEmpty()?QString():"  ·  Video: "+i.videoCodec));
+    detail_->setText(id.isEmpty()?"Ready when you are. Calls stay on the phone display.":i.remote+"\n"+callStateLabel(i.rawState)+"  •  Media: "+(i.encryption.isEmpty()?"negotiating":i.encryption)+"  •  "+QString::number(i.duration)+"s"+(i.audioCodec.isEmpty()?QString():"\nAudio: "+i.audioCodec)+(i.videoCodec.isEmpty()?QString():"  ·  Video: "+i.videoCodec));
     if(desk_){int registered=0,received=0;bool busy=false;for(const auto &a:accounts_)registered+=registrationLabel(accountStates_.value(a.id))=="Registered";for(const auto &fax:engine_.faxes()){received+=fax.incoming;busy|=fax.state=="dialing"||fax.state=="negotiating"||fax.state=="sending"||fax.state=="receiving";}
+        for(auto dialog:callDialogs_)if(dialog&&(dialog->callInfo().id!=id||dialog->isVisible()))dialog->setInlineHost(nullptr);
+        if(auto selected=callDialogs_.value(id))if(!selected->isVisible())selected->setInlineHost(desk_->callHost);
+        auto selected=callDialogs_.value(id);desk_->callMessage->setText(selected?selected->actionMessage():lastCallMessage_);desk_->callMessage->setToolTip(desk_->callMessage->text());const auto digits=selected?selected->dtmfText():QString();desk_->dtmfDisplay->setText(digits.isEmpty()?QString():"DTMF "+digits.right(6));desk_->dtmfDisplay->setToolTip(digits);
         desk_->refresh(i,calls_->count(),registered,accounts_.size(),chat_?chat_->unreadCount():0,received,busy);
         if(auto dialog=callDialogs_.value(id)){
-            const QPair<DeskButton*,const char*> controls[]={{desk_->hold,"callHold"},{desk_->mute,"callMute"},{desk_->record,"callRecord"},{desk_->transfer,"callTransfer"},{desk_->conference,"callConference"}};
+            const QPair<DeskButton*,const char*> controls[]={{desk_->hold,"callHold"},{desk_->mute,"callMute"},{desk_->record,"callRecord"},{desk_->transfer,"callTransfer"},{desk_->conference,"callConference"},{desk_->forward,"callForward"},{desk_->attended,"callAttendedTransfer"},{desk_->receiveFax,"callFax"},{desk_->addCall,"callAddCall"},{desk_->audioCall,"callAnswer"}};
             for(const auto &control:controls)if(auto *button=dialog->findChild<QPushButton*>(control.second))control.first->setEnabled(button->isEnabled());
             desk_->findChild<DeskButton*>("deskAction0")->setEnabled(desk_->hold->isEnabled());desk_->findChild<DeskButton*>("deskAction1")->setEnabled(desk_->transfer->isEnabled());
         }
+        if(id.isEmpty()){desk_->addCall->setEnabled(true);desk_->audioCall->setEnabled(true);desk_->callHost->dismiss();}
+        updateMainVideo(i);
         if(auto *summary=findChild<QLabel*>("deskFaxSummary"))summary->setText(QString("%1 received · %2 sent").arg(received).arg(engine_.faxes().size()-received));}
 
 }

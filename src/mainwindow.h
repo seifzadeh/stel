@@ -12,8 +12,10 @@ class QTabWidget;
 class QSystemTrayIcon;
 class QDialog;
 class QCloseEvent;
+class QKeyEvent;
 namespace stel {
 class SettingsWidget;
+class RemoteControlServer;
 class DeskPhone;
 class CallDialog;
 class ChatWidget;
@@ -27,11 +29,14 @@ public:
     void showSettings();
 protected:
     void closeEvent(QCloseEvent *) override;
+    void keyPressEvent(QKeyEvent *) override;
 private:
     Store store_;
     Preferences prefs_;
     QVector<Account> accounts_;
     SipEngine engine_;
+    RemoteControlServer *remoteControl_=nullptr;
+    void reloadApiConfiguration(const QString &);
     bool ready_ = false, settingsValid_ = true;
     bool closing_ = false, confirmingExit_ = false;
     QComboBox *accountBox_ = nullptr;
@@ -50,6 +55,9 @@ private:
     QHash<QString,CallInfo> callCache_;
     QHash<QString,QPointer<CallDialog>> callDialogs_;
     QHash<QString,QString> accountStates_;
+    QString videoCallId_,inlineVideoId_,lastCallMessage_;
+    void mainCallAction(const char *);
+    void updateMainVideo(const CallInfo &);
     void rebuildAccounts();
     void refreshExpansion();
     void configureExpansion(int);
