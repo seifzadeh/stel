@@ -90,8 +90,15 @@ private slots:
         QCOMPARE(d.get("/api/v1/devices").status,200);QVERIFY(!d.get("/api/v1/codecs").json["audio"].toArray().isEmpty());
         QCOMPARE(request(d.api.endpoint(),"/api/v1/contacts","PUT",{{"contacts",QJsonArray{QJsonObject{{"name",QString::fromUtf8("پشتیبانی")},{"uri","1002"}}}}},d.token).status,200);QCOMPARE(d.store.contacts().size(),1);
         auto key=QJsonObject{{"type","speed-dial"},{"label","Support"},{"accountId","alice"},{"target","1002"}};QCOMPARE(request(d.api.endpoint(),"/api/v1/expansion/1","PUT",key,d.token).status,200);QCOMPARE(d.prefs.expansionKeys[0].label,QString("Support"));QCOMPARE(d.get("/api/v1/blf").json["keys"].toArray().size(),12);
-        QVector<Account> accounts;Preferences saved;QVERIFY(d.store.load(accounts,saved));QCOMPARE(accounts[0].password,QString("api-test-password"));QCOMPARE(saved.remoteControl.tokenHash,d.prefs.remoteControl.tokenHash);QFile file(d.directory.path()+"/settings.json");QVERIFY(file.open(QIODevice::ReadOnly));const auto bytes=file.readAll();QVERIFY(!bytes.contains(d.token.toLatin1()));QVERIFY(!bytes.contains("api-test-password"));
-        QCOMPARE(request(d.api.endpoint(),"/api/v1/accounts/alice","DELETE",{},d.token).status,200);QVERIFY(d.accounts.isEmpty());
+        QVector<Account> accounts;Preferences saved;QVERIFY(d.store.load(accounts,saved));QCOMPARE(accounts[0].password,QString("api-test-password"));QCOMPARE(saved.remoteControl.tokenHash,d.prefs.remoteControl.tokenHash);
+        {
+            // Windows QFile opens without FILE_SHARE_DELETE. Release this read
+            // handle before DELETE saves settings through QSaveFile's rename.
+            QFile file(d.directory.path()+"/settings.json");QVERIFY(file.open(QIODevice::ReadOnly));const auto bytes=file.readAll();QVERIFY(!bytes.contains(d.token.toLatin1()));QVERIFY(!bytes.contains("api-test-password"));
+        }
+        const auto deleted=request(d.api.endpoint(),"/api/v1/accounts/alice","DELETE",{},d.token);
+        QVERIFY2(deleted.status==200,qPrintable(QString("DELETE returned HTTP %1: %2").arg(deleted.status).arg(QString::fromUtf8(deleted.bytes))));QVERIFY(d.accounts.isEmpty());
+        QVERIFY(d.store.load(accounts,saved));QVERIFY(accounts.isEmpty());
     }
     void callsAndYealink_data(){QTest::addColumn<bool>("video");QTest::newRow("voice")<<false;QTest::newRow("video")<<true;}
     void callsAndYealink(){
