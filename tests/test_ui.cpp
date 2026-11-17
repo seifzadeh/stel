@@ -167,11 +167,16 @@ private slots:
         QFETCH(bool,forward);QTemporaryDir tmp;stel::Preferences p;p.inputDevice=stel::dummyMicTone();p.outputDevice=stel::dummySpeaker();stel::Store store(tmp.path()+"/ui");QVERIFY(store.save({direct("bob")},p));
         stel::MainWindow window(store.directory());QVERIFY(window.ready());window.show();auto *desk=window.findChild<stel::DeskPhone*>();auto *engine=window.findChild<stel::SipEngine*>();
         IsolatedSipEngine caller,destination;QVERIFY(caller.start(p,tmp.path()+"/caller",true));QVERIFY(destination.start(p,tmp.path()+"/destination",true));QVERIFY(caller.addAccount(direct("alice")));QVERIFY(destination.addAccount(direct("carol")));
-        QVERIFY(caller.dial("alice",uri(*engine,"bob")));QTRY_VERIFY(desk->audioCall->isEnabled()&&desk->hangup->isEnabled());
+        QVERIFY(caller.dial("alice",uri(*engine,"bob")));
+        QTRY_VERIFY_WITH_TIMEOUT([&]{for(const auto &call:engine->calls())if(call.incoming&&call.rawState==LinphoneCallIncomingReceived)return true;return false;}(),6000);
+        QTRY_VERIFY_WITH_TIMEOUT([&]{for(const auto &call:caller.calls())if(call.rawState==LinphoneCallOutgoingRinging)return true;return false;}(),6000);
+        QTRY_VERIFY(desk->audioCall->isEnabled()&&desk->hangup->isEnabled());
         for(auto *view:window.findChildren<stel::CallDialog*>())QVERIFY(!view->isVisible());
         if(forward){desk->forward->click();QVERIFY(desk->callHost->isVisible());desk->callHost->findChild<QLineEdit*>("callRouteTarget")->setText(uri(destination,"carol"));button(*desk->callHost,"callRouteApply")->click();QTRY_VERIFY_WITH_TIMEOUT(!destination.calls().isEmpty(),6000);for(const auto &call:destination.calls())destination.hangup(call.id);}
         else desk->hangup->click();
-        QTRY_VERIFY_WITH_TIMEOUT(engine->calls().isEmpty(),6000);for(const auto &call:caller.calls())caller.hangup(call.id);QTRY_VERIFY(caller.calls().isEmpty());QVERIFY(window.isVisible());
+        // Let the final rejection reach the caller. Sending CANCEL here can
+        // race its pending 486/302 and does not test the phone's Reject action.
+        QTRY_VERIFY_WITH_TIMEOUT(engine->calls().isEmpty()&&caller.calls().isEmpty()&&destination.calls().isEmpty(),10000);QVERIFY(window.isVisible());
     }
     void expansionKeysDialAndShowBlf() {
         QTemporaryDir tmp;MiniPbx pbx;stel::Store store(tmp.path());stel::Preferences prefs;
