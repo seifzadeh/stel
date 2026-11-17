@@ -3,6 +3,7 @@
 #include "dummydevices.h"
 #include "faxmedia.h"
 #include "paging.h"
+#include "blf.h"
 #include <QObject>
 #include <QHash>
 #include <QSet>
@@ -65,6 +66,8 @@ public:
     void mute(bool);
     void setDnd(bool enabled);
     void refreshRegistrations();
+    void setExpansionKeys(const QVector<ExpansionKey> &);
+    BlfInfo blfInfo(int key) const;
     bool applyDevices(const Preferences &);
     void setVideoWindows(quintptr remote, quintptr preview);
     QStringList soundDevices(bool captureOnly = false, bool playbackOnly = false) const;
@@ -84,7 +87,21 @@ signals:
     void notification(const QString &message);
     void messageChanged(const stel::MessageInfo &message);
     void faxChanged(const stel::FaxInfo &fax);
+    void blfChanged(const stel::BlfInfo &info);
 private:
+    struct BlfSubscription { LinphoneEvent *event=nullptr; DialogInfo dialogs; qint64 retryAt=0; };
+    QVector<ExpansionKey> expansionKeys_;
+    QHash<int,BlfSubscription> blfSubscriptions_;
+    QHash<LinphoneEvent*,int> blfEvents_;
+    QVector<QPair<LinphoneEvent*,qint64>> retiredBlf_;
+    QHash<int,BlfInfo> blfInfos_;
+    QTimer blfRetry_;
+    void clearBlf();
+    void releaseBlf(int);
+    void syncBlf();
+    void setBlfState(int,BlfState,const QString &);
+    static void blfSubscriptionCb(LinphoneCore *,LinphoneEvent *,LinphoneSubscriptionState);
+    static void blfNotifyCb(LinphoneCore *,LinphoneEvent *,const char *,const LinphoneContent *);
     struct AccountHandle { Account config; LinphoneAccount *account = nullptr; LinphoneAuthInfo *auth = nullptr; LinphoneAuthInfo *turnAuth = nullptr; };
     LinphoneCore *core_ = nullptr;
     void (*videoRendererInstaller_)(LinphoneCore *) = nullptr;

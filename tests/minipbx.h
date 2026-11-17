@@ -24,7 +24,26 @@ public:
     QList<QByteArray> sdpAnswers;
     bool bareRequestUri=true;
     QList<QPair<QByteArray,QByteArray>> incomingInviteHeaders;
+    int blfResponse=200,blfSubscribes=0,blfUnsubscribes=0,blfNotifyReplies=0;
+    QList<QByteArray> blfFrom,blfAccept;
+    QStringList blfTargets;
+    int activeBlfSubscriptions() const {return subscriptions_.size();}
+    void notifyBlf(const QString &target,const QByteArray &xml) {
+        for(auto it=subscriptions_.begin();it!=subscriptions_.end();++it)if(it->target==target) {
+            auto &s=it.value();const auto branch="z9hG4bK-blf-"+QUuid::createUuid().toByteArray(QUuid::WithoutBraces);
+            QList<QByteArray> lines{"NOTIFY "+s.contact+" SIP/2.0",
+                "Via: SIP/2.0/UDP 127.0.0.1:"+QByteArray::number(port())+";branch="+branch,
+                "Max-Forwards: 70","From: "+s.to,"To: "+s.from,"Call-ID: "+it.key(),
+                "CSeq: "+QByteArray::number(++s.sequence)+" NOTIFY",
+                "Contact: <sip:"+target.toUtf8()+"@127.0.0.1:"+QByteArray::number(port())+">",
+                "Event: dialog","Subscription-State: active;expires=600",
+                "Content-Type: application/dialog-info+xml","Content-Length: "+QByteArray::number(xml.size())};
+            send(lines,xml,s.address,s.port);
+        }
+    }
 private:
+    struct Subscription {QString target;QByteArray from,to,contact;QHostAddress address;quint16 port;int sequence=0;};
+    QHash<QByteArray,Subscription> subscriptions_;
     struct Dialog {QString a,b,aId,bId;};
     struct Transaction {QHostAddress address;quint16 port;QByteArray id;QList<QByteArray> vias;};
     QUdpSocket socket_;
@@ -51,6 +70,20 @@ private:
             const int split=data.indexOf("\r\n\r\n");if(split<0)continue;
             QList<QByteArray> lines;for(auto line:data.left(split).split('\n'))lines<<line.trimmed();if(lines.isEmpty())continue;
             const auto body=data.mid(split+4);
+            if(lines[0].startsWith("SUBSCRIBE ")&&header(lines,"event")=="dialog") {
+                ++blfSubscribes;const auto id=header(lines,"call-id");const auto target=user(header(lines,"to"));
+                blfFrom<<header(lines,"from");blfAccept<<header(lines,"accept");blfTargets<<target;
+                auto to=header(lines,"to");if(!to.contains(";tag="))to+=";tag=blf-pbx";
+                const bool off=header(lines,"expires")=="0";if(off)++blfUnsubscribes;
+                QList<QByteArray> response{blfResponse==200?QByteArray("SIP/2.0 200 OK"):QByteArray("SIP/2.0 403 Forbidden")};
+                for(const auto &key:{"via","from","call-id","cseq"})response<<QByteArray(key)+": "+header(lines,key);
+                response<<"To: "+to<<"Contact: <sip:"+target.toUtf8()+"@127.0.0.1:"+QByteArray::number(this->port())+">"<<"Expires: "+QByteArray(off?"0":"600")<<"Content-Length: 0";
+                send(response,{},address,port);
+                if(off){subscriptions_.remove(id);continue;}
+                if(blfResponse==200){subscriptions_[id]={target,header(lines,"from"),to,uri(header(lines,"contact")).toUtf8(),address,port,0};
+                    notifyBlf(target,("<dialog-info xmlns=\"urn:ietf:params:xml:ns:dialog-info\" version=\"0\" state=\"full\" entity=\"sip:"+target+"@localhost\"/>").toUtf8());}
+                continue;
+            }
             if(lines[0].startsWith("INVITE "))inviteBodies<<body;
             if(lines[0].startsWith("REGISTER ")) {
                 const auto name=user(header(lines,"from"));const auto contact=header(lines,"contact");
@@ -61,6 +94,7 @@ private:
             }
             const auto id=QString::fromUtf8(header(lines,"call-id"));
             if(lines[0].startsWith("SIP/2.0 ")) {
+                if(header(lines,"cseq").endsWith("NOTIFY")){++blfNotifyReplies;continue;}
                 if(lines[0].startsWith("SIP/2.0 200")&&header(lines,"cseq").endsWith("INVITE"))sdpAnswers<<body;
                 const auto branch=QRegularExpression("branch=([^; ]+)").match(QString::fromUtf8(header(lines,"via"))).captured(1);
                 if(!transactions_.contains(branch))continue;

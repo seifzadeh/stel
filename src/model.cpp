@@ -78,16 +78,34 @@ QString Account::validate() const {
     if (expires < 60 || expires > 86400) return "Registration expiry must be 60–86400 seconds.";
     return {};
 }
+QJsonObject ExpansionKey::toJson() const {
+    return {{"type",type},{"label",label},{"accountId",accountId},{"target",target}};
+}
+ExpansionKey ExpansionKey::fromJson(const QJsonObject &o) {
+    ExpansionKey key;key.type=o["type"].toString("disabled");key.label=o["label"].toString();
+    key.accountId=o["accountId"].toString();key.target=o["target"].toString();return key;
+}
+QString ExpansionKey::validate() const {
+    if(!QStringList{"disabled","speed-dial","blf"}.contains(type))return "Choose Disabled, Speed Dial or BLF.";
+    if(label.size()>80)return "Key labels must be 80 characters or shorter.";
+    if(type=="disabled")return {};
+    if(accountId.isEmpty())return "Choose an account for this key.";
+    if(target.trimmed().isEmpty()||target.size()>512||target.contains('\r')||target.contains('\n'))return "Enter an extension or SIP address for this key.";
+    return {};
+}
 QJsonObject Preferences::toJson() const {
+    QJsonArray keys;for(const auto &key:expansionKeys)keys.append(key.toJson());
     return {{"caFile",caFile},{"inputDevice",inputDevice},{"outputDevice",outputDevice},{"videoDevice",videoDevice},{"dnd",dnd},
         {"signallingAddress",signallingAddress},{"mediaAddress",mediaAddress},
         {"customAudioCodecs",customAudioCodecs},{"customVideoCodecs",customVideoCodecs},
-        {"audioCodecs",QJsonArray::fromStringList(audioCodecs)},{"videoCodecs",QJsonArray::fromStringList(videoCodecs)},
+        {"audioCodecs",QJsonArray::fromStringList(audioCodecs)},{"videoCodecs",QJsonArray::fromStringList(videoCodecs)},{"expansionKeys",keys},
         {"sipUdpPort",sipUdpPort},{"sipTcpPort",sipTcpPort},{"sipTlsPort",sipTlsPort},
         {"audioPortMin",audioPortMin},{"audioPortMax",audioPortMax},{"videoPortMin",videoPortMin},{"videoPortMax",videoPortMax}};
 }
 Preferences Preferences::fromJson(const QJsonObject &o) {
     Preferences p; p.caFile=o["caFile"].toString(); p.inputDevice=o["inputDevice"].toString();
+    const auto keys=o["expansionKeys"].toArray();
+    for(int n=0;n<qMin(ExpansionKeyCount,keys.size());++n)p.expansionKeys[n]=ExpansionKey::fromJson(keys[n].toObject());
     p.outputDevice=o["outputDevice"].toString(); p.videoDevice=o["videoDevice"].toString(); p.dnd=o["dnd"].toBool();
     p.signallingAddress=o["signallingAddress"].toString();p.mediaAddress=o["mediaAddress"].toString();
     p.customAudioCodecs=o["customAudioCodecs"].toBool();p.customVideoCodecs=o["customVideoCodecs"].toBool();
@@ -98,6 +116,8 @@ Preferences Preferences::fromJson(const QJsonObject &o) {
     p.videoPortMin=o["videoPortMin"].toInt(11000);p.videoPortMax=o["videoPortMax"].toInt(11198);return p;
 }
 QString Preferences::validate() const {
+    if(expansionKeys.size()!=ExpansionKeyCount)return "Exactly 12 expansion keys are required.";
+    for(int n=0;n<expansionKeys.size();++n){const auto error=expansionKeys[n].validate();if(!error.isEmpty())return QString("Key %1: %2").arg(n+1).arg(error);}
     for(const auto &ip:{signallingAddress,mediaAddress})
         if(!ip.isEmpty() && QHostAddress(ip).isNull())return "Choose a valid local IP address.";
     for(int port:{sipUdpPort,sipTcpPort,sipTlsPort})if(port < -1 || port>65535)return "SIP ports must be Auto (-1), disabled (0), or 1–65535.";

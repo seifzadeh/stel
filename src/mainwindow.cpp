@@ -62,6 +62,14 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
     connect(calls_,&QListWidget::itemActivated,this,[this](QListWidgetItem *item){showCall(item->data(Qt::UserRole).toString());});
     connect(openCall_,&QPushButton::clicked,this,[this]{showCall(selectedCall());});
     connect(desk_,&DeskPhone::digitPressed,this,[this](QChar digit){const auto id=selectedCall();const auto call=callCache_.value(id);if(!id.isEmpty()&&(call.rawState==LinphoneCallStreamsRunning||call.rawState==LinphoneCallConnected)){if(auto dialog=callDialogs_.value(id)){const auto name="callDtmf_"+(digit=='*'?QString("star"):digit=='#'?QString("hash"):QString(digit));if(auto *button=dialog->findChild<QPushButton*>(name))button->click();}}else{target_->insert(digit);tabs_->setCurrentIndex(0);}});
+    connect(desk_,&DeskPhone::expansionConfigureRequested,this,&MainWindow::configureExpansion);
+    connect(desk_,&DeskPhone::expansionPressed,this,[this](int index){
+        const auto key=prefs_.expansionKeys.value(index);if(key.type=="disabled"){configureExpansion(index);return;}
+        const int account=accountBox_->findData(key.accountId);
+        if(account<0){statusBar()->showMessage("Choose an existing account for this expansion key.",10000);configureExpansion(index);return;}
+        accountBox_->setCurrentIndex(account);target_->setText(key.target);tabs_->setCurrentIndex(0);dial(false);
+    });
+    connect(&engine_,&SipEngine::blfChanged,desk_,&DeskPhone::setExpansionState);
     connect(desk_->audioCall,&QPushButton::clicked,this,[this]{const auto call=callCache_.value(selectedCall());if(call.incoming&&(call.rawState==LinphoneCallIncomingReceived||call.rawState==LinphoneCallIncomingEarlyMedia))engine_.answer(call.id,false);else dial(false);});
     connect(desk_->videoCall,&QPushButton::clicked,this,[this]{dial(true);});
     connect(desk_->hangup,&QPushButton::clicked,this,[this]{if(!selectedCall().isEmpty())engine_.hangup(selectedCall());});
@@ -106,13 +114,13 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
         engine_.addAccount(runtime);if(a.credentialsRequired)accountStates_[a.id]="CredentialsRequired";
     }
     settingsDialog_=new QDialog(this);settingsDialog_->setObjectName("settingsDialog");settingsDialog_->setWindowTitle("Stel • Settings");
-    settingsDialog_->setWindowFlag(Qt::WindowContextHelpButtonHint,false);settingsDialog_->resize(980,760);
+    settingsDialog_->setWindowFlag(Qt::WindowContextHelpButtonHint,false);settingsDialog_->resize(1080,850);
     auto *settingsLayout=new QVBoxLayout(settingsDialog_);settingsLayout->setContentsMargins(10,10,10,10);settingsLayout->addWidget(createSettings());settingsLayout->addWidget(dnd);dnd->show();
     auto *eventsButton=new QPushButton("Call and registration events…");settingsLayout->addWidget(eventsButton);connect(eventsButton,&QPushButton::clicked,events,&QDialog::show);
     auto *settingsButtons=new QDialogButtonBox(QDialogButtonBox::Close);settingsButtons->setObjectName("settingsButtons");settingsLayout->addWidget(settingsButtons);
     connect(settingsButtons,&QDialogButtonBox::rejected,settingsDialog_,&QDialog::reject);
     connect(settingsDialog_,&QDialog::finished,this,[this]{if(!closing_){if(isMinimized())showNormal();else show();raise();activateWindow();}});
-    rebuildAccounts();refreshContacts();refreshHistory();
+    rebuildAccounts();refreshContacts();refreshHistory();refreshExpansion();
     if(QSystemTrayIcon::isSystemTrayAvailable()) {
         tray_=new QSystemTrayIcon(windowIcon(),this);tray_->setToolTip("Stel softphone");tray_->show();
         connect(tray_,&QSystemTrayIcon::activated,this,[this](QSystemTrayIcon::ActivationReason){showNormal();raise();activateWindow();});
@@ -155,9 +163,12 @@ QWidget *MainWindow::createHistory() {
 QWidget *MainWindow::createSettings() {
     settings_=new SettingsWidget(engine_,accounts_,prefs_,store_,settingsValid_,settingsDialog_);
     connect(settings_,&SettingsWidget::accountsChanged,this,&MainWindow::rebuildAccounts);
+    connect(settings_,&SettingsWidget::expansionChanged,this,&MainWindow::refreshExpansion);
     return settings_;
 }
 void MainWindow::showSettings(){if(closing_)return;settings_->openAccounts();settingsDialog_->show();settingsDialog_->raise();settingsDialog_->activateWindow();}
+void MainWindow::configureExpansion(int key){if(closing_)return;settings_->openExpansion(key);settingsDialog_->show();settingsDialog_->raise();settingsDialog_->activateWindow();}
+void MainWindow::refreshExpansion(){desk_->setExpansionKeys(prefs_.expansionKeys);engine_.setExpansionKeys(prefs_.expansionKeys);for(int n=0;n<ExpansionKeyCount;++n)desk_->setExpansionState(engine_.blfInfo(n));}
 void MainWindow::closeEvent(QCloseEvent *event) {
     if(credentialOperationActive()){event->ignore();return;}
     if(closing_){event->accept();return;}

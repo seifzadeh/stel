@@ -6,7 +6,7 @@
 Stel brings your PBX accounts to the desktop. Make voice and video calls,
 exchange messages, and send or receive faxes from a Qt/C++ application.
 
-![Stel desktop](website/assets/screenshots/v0.11.0/main-window.png)
+![Stel desktop](website/assets/screenshots/v0.13.0/main-window.png)
 
 [All pages](docs/SCREENSHOTS.md#captured-pages) · [Website gallery](https://seifzadeh.github.io/stel/?lang=en#screenshots)
 
@@ -48,6 +48,8 @@ exchange messages, and send or receive faxes from a Qt/C++ application.
 
 Also included:
 
+- [12 expansion keys](docs/EXPANSION.md): one-click Speed Dial and BLF, with green
+  for available extensions and red for busy ones. Set the account and label for each key.
 - Auto Answer and Caller ID Name for each account.
 - [SIP paging / intercom](docs/PAGING.md) via Alert-Info, with per-account microphone and alert-tone settings.
 - Dummy microphone and camera for testing without physical devices.

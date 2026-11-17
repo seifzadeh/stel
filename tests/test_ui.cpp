@@ -6,6 +6,7 @@
 #include "chatwidget.h"
 #include "deskphone.h"
 #include <QInputMethodEvent>
+#include <QContextMenuEvent>
 #include <QScrollArea>
 #include <QTextOption>
 #include <QCheckBox>
@@ -120,6 +121,46 @@ private slots:
         screenshot(window,"stel-about");
     }
     void initTestCase(){if(qEnvironmentVariableIsSet("STEL_VERBOSE_TESTS"))linphone_logging_service_set_log_level(linphone_logging_service_get(),LinphoneLogLevelMessage);}
+    void expansionKeysDialAndShowBlf() {
+        QTemporaryDir tmp;MiniPbx pbx;stel::Store store(tmp.path());stel::Preferences prefs;
+        prefs.inputDevice=stel::dummyMicTone();prefs.outputDevice=stel::dummySpeaker();
+        QVector<stel::Account> accounts;
+        for(const auto &user:{"1001","1002"}){auto a=direct(user);a.server=pbx.server();a.registerEnabled=true;a.password="expansion-ui-test";accounts<<a;}
+        prefs.expansionKeys[0]={"speed-dial","Reception","1001","1002"};
+        prefs.expansionKeys[1]={"blf",QString::fromUtf8("پشتیبانی"),"1001","1002"};
+        for(int n=2;n<11;++n)prefs.expansionKeys[n]={"speed-dial",QString("Desk %1").arg(n+1),"1001",QString::number(1100+n)};
+        QString error;QVERIFY2(store.save(accounts,prefs,&error),qPrintable(error));
+        {
+            stel::MainWindow window(tmp.path());QVERIFY(window.ready());window.resize(1448,1086);window.show();
+            auto *engine=window.findChild<stel::SipEngine*>();auto *desk=window.findChild<stel::DeskPhone*>();QVERIFY(engine);QVERIFY(desk);
+            for(int n=0;n<12;++n)QVERIFY(button(window,qPrintable("expansionKey"+QString::number(n))));
+            QTRY_COMPARE_WITH_TIMEOUT(engine->blfInfo(1).state,stel::BlfState::Idle,6000);
+            QCOMPARE(button(window,"expansionKey1")->property("blfState").toInt(),int(stel::BlfState::Idle));
+            screenshot(window,"stel-expansion-idle");
+            pbx.notifyBlf("1002","<dialog-info xmlns=\"urn:ietf:params:xml:ns:dialog-info\" version=\"1\" state=\"full\" entity=\"sip:1002@localhost\"><dialog id=\"call\"><state>confirmed</state></dialog></dialog-info>");
+            QTRY_COMPARE(button(window,"expansionKey1")->property("blfState").toInt(),int(stel::BlfState::Busy));screenshot(window,"stel-expansion-busy");
+            auto *key=button(window,"expansionKey1");QContextMenuEvent context(QContextMenuEvent::Mouse,key->rect().center(),key->mapToGlobal(key->rect().center()));QApplication::sendEvent(key,&context);
+            auto *settings=window.findChild<QDialog*>("settingsDialog");QVERIFY(settings->isVisible());QCOMPARE(window.findChild<QTableWidget*>("expansionTable")->currentRow(),1);settings->close();
+            button(window,"expansionKey11")->click();QVERIFY(settings->isVisible());
+            auto *table=window.findChild<QTableWidget*>("expansionTable");QVERIFY(table);QCOMPARE(table->rowCount(),12);QCOMPARE(table->currentRow(),11);
+            auto *type=window.findChild<QComboBox*>("expansionType11");type->setCurrentIndex(type->findData("speed-dial"));
+            window.findChild<QLineEdit*>("expansionLabel11")->setText(QString::fromUtf8("فنی / Tech"));
+            auto *account=window.findChild<QComboBox*>("expansionAccount11");account->setCurrentIndex(account->findData("1002"));
+            window.findChild<QLineEdit*>("expansionTarget11")->setText("1001");button(window,"applyExpansion")->click();
+            stel::Preferences saved;QVector<stel::Account> savedAccounts;QVERIFY(store.load(savedAccounts,saved));QCOMPARE(saved.expansionKeys[11].accountId,QString("1002"));
+            QCOMPARE(saved.expansionKeys[11].label,QString::fromUtf8("فنی / Tech"));screenshot(window,"stel-expansion-settings");settings->close();QVERIFY(window.isVisible());
+            button(window,"expansionKey0")->click();QTRY_VERIFY_WITH_TIMEOUT(pbx.invites>0,6000);QTRY_VERIFY(dialog(window,true));
+            bool outgoing=false;for(const auto &call:engine->calls())if(!call.incoming){QCOMPARE(call.accountId,QString("1001"));QCOMPARE(call.remoteUsername,QString("1002"));outgoing=true;}QVERIFY(outgoing);
+            for(const auto &call:engine->calls())engine->hangup(call.id);QTRY_VERIFY(engine->calls().isEmpty());
+            const auto firstInvites=pbx.invites;button(window,"expansionKey11")->click();QTRY_VERIFY(pbx.invites>firstInvites);
+            for(const auto &call:engine->calls())if(!call.incoming)QCOMPARE(call.accountId,QString("1002"));
+            for(const auto &call:engine->calls())engine->hangup(call.id);QTRY_VERIFY(engine->calls().isEmpty());
+        }
+        {
+            stel::MainWindow reopened(tmp.path());QVERIFY(reopened.ready());QCOMPARE(button(reopened,"expansionKey11")->text(),QString::fromUtf8("فنی / Tech"));
+            QCOMPARE(button(reopened,"expansionKey1")->property("keyType").toString(),QString("blf"));
+        }
+    }
     void deskPhoneHardwareControls(){
         QTemporaryDir tmp;MiniPbx pbx;stel::Store store(tmp.path());stel::Preferences prefs;prefs.inputDevice=stel::dummyMicTone();prefs.outputDevice=stel::dummySpeaker();
         QVector<stel::Account> accounts;for(const auto &user:{"1001","1002"}){auto a=direct(user);a.server=pbx.server();a.registerEnabled=true;a.password="desk-private-test";accounts<<a;}

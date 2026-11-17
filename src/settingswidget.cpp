@@ -1,5 +1,6 @@
 #include "settingswidget.h"
 #include "codecselector.h"
+#include "expansionwidget.h"
 #include "branding.h"
 #include <QComboBox>
 #include <QDateTime>
@@ -49,6 +50,10 @@ SettingsWidget::SettingsWidget(SipEngine &engine,QVector<Account> &accounts,Pref
     setObjectName("settingsWidget");auto *layout=new QVBoxLayout(this);layout->setContentsMargins(12,12,12,12);
     pages_=new QTabWidget;pages_->setObjectName("settingsPages");layout->addWidget(pages_);
     pages_->addTab(accountsPage(),navigationIcon(NavigationIcon::Accounts),"Accounts");pages_->addTab(audioPage(),navigationIcon(NavigationIcon::Audio),"Audio");pages_->addTab(videoPage(),navigationIcon(NavigationIcon::Video),"Video");pages_->addTab(networkPage(),navigationIcon(NavigationIcon::Network),"Network");pages_->addTab(securityPage(),navigationIcon(NavigationIcon::Security),"Security");pages_->addTab(aboutPage(),navigationIcon(NavigationIcon::Info),"About");
+    expansion_=new ExpansionWidget(engine_,accounts_,prefs_,store_,canSave_,pages_);
+    pages_->insertTab(5,expansion_,navigationIcon(NavigationIcon::General),"Expansion");
+    connect(expansion_,&ExpansionWidget::keysChanged,this,&SettingsWidget::expansionChanged);
+    connect(this,&SettingsWidget::accountsChanged,expansion_,&ExpansionWidget::refreshAccounts);
     styleNavigationTabs(pages_,NavigationLevel::Settings);
     for(const auto &a:accounts_) {
         states_[a.id]=a.credentialsRequired?"CredentialsRequired":engine_.registrationState(a.id);
@@ -62,6 +67,7 @@ SettingsWidget::SettingsWidget(SipEngine &engine,QVector<Account> &accounts,Pref
     rebuildList();if(list_->count())selectAccount(list_->item(0)->data(Qt::UserRole).toString());else updateAccountStatus();
 }
 void SettingsWidget::openAccounts(){pages_->setCurrentIndex(0);}
+void SettingsWidget::openExpansion(int key){pages_->setCurrentWidget(expansion_);expansion_->focusKey(key);}
 QWidget *SettingsWidget::accountsPage() {
     auto *page=new QWidget;auto *layout=new QHBoxLayout(page);layout->setSpacing(14);
     auto *left=new QVBoxLayout;left->addWidget(new QLabel("SIP accounts"));list_=new QListWidget;list_->setObjectName("settingsAccounts");list_->setMinimumWidth(185);list_->setMaximumWidth(235);left->addWidget(list_,1);

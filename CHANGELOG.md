@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.13.0 — 2026-11-16
+
+- Replace the five navigation shortcuts under the display with 12 configurable
+  expansion keys. Each key has its own label, SIP account and destination.
+- Add one-click Speed Dial and Yealink-style BLF using SIP dialog subscriptions.
+  Available extensions show green, busy extensions red, ringing flashes red,
+  and unconfirmed or disconnected status stays grey.
+- Add Settings → Expansion and right-click editing, with saved configurations,
+  automatic subscription renewal and recovery, and multi-account routing.
+- Safely drain pending BLF notifications when accounts reconnect or the app closes.
+- Test real SIP SUBSCRIBE/NOTIFY, full and partial dialog updates, subscription
+  rejection, direct dialing, UI status and configuration persistence.
+
 ## 0.12.0 — 2026-11-16
 
 - Add a Windows setup wizard with per-user installation, Start-menu and optional

@@ -49,12 +49,14 @@ SipEngine::SipEngine(QObject *parent) : QObject(parent) {
     qRegisterMetaType<stel::CallInfo>();
     qRegisterMetaType<stel::MessageInfo>();
     qRegisterMetaType<stel::FaxInfo>();
+    qRegisterMetaType<stel::BlfInfo>();
+    blfRetry_.setInterval(3000);connect(&blfRetry_,&QTimer::timeout,this,&SipEngine::syncBlf);
     iterate_.setInterval(20);
     connect(&iterate_,&QTimer::timeout,this,[this]{ if(core_)linphone_core_iterate(core_); });
 }
 SipEngine::~SipEngine() { shutdown(); }
 void SipEngine::shutdown() {
-    stopping_=true; iterate_.stop();
+    stopping_=true; iterate_.stop();blfRetry_.stop();clearBlf();
     for(auto &h:faxes_)if(h.media){h.media->stop();if(h.info.state=="dialing"||h.info.state=="sending"||h.info.state=="receiving"||h.info.state=="negotiating"){h.info.state="interrupted";h.info.detail="The application closed before the fax completed.";}}
     if(!dataDirectory_.isEmpty())persistFaxes();
     // Children must stop while the composite engine and its signal state live.
@@ -67,6 +69,8 @@ void SipEngine::shutdown() {
             releaseMessage(message);
         }
         linphone_core_stop(core_);
+        for(const auto &retired:retiredBlf_)linphone_event_unref(retired.first);
+        retiredBlf_.clear();
         for(auto *c:calls_)linphone_call_unref(c);
         calls_.clear(); callIds_.clear();localPeerCalls_.clear();pagingRequests_.clear();pagingAnswered_.clear();
         for(const auto &h:accounts_) {
@@ -100,7 +104,7 @@ bool SipEngine::start(const Preferences &prefs,const QString &directory,bool tes
         bool found=false;for(const auto &local:localAddresses())found|=QHostAddress(local.address)==QHostAddress(ip);
         if(!found)return fail("Local IP is not available: "+ip);
     }
-    preferences_=prefs;testMode_=testMode;
+    preferences_=prefs;testMode_=testMode;expansionKeys_=prefs.expansionKeys;
     dataDirectory_=directory; QDir().mkpath(directory+"/certificates"); QDir().mkpath(directory+"/recordings");
     QDir().mkpath(directory+"/cache");
     QDir().mkpath(directory+"/faxes");QFile::setPermissions(directory+"/faxes",QFile::ReadOwner|QFile::WriteOwner|QFile::ExeOwner);loadFaxes();
@@ -163,6 +167,8 @@ bool SipEngine::start(const Preferences &prefs,const QString &directory,bool tes
     linphone_core_cbs_set_call_state_changed(cb,callCb);
     linphone_core_cbs_set_transfer_state_changed(cb,transferCb);
     linphone_core_cbs_set_message_received(cb,messageReceivedCb);
+    linphone_core_cbs_set_notify_received(cb,blfNotifyCb);
+    linphone_core_cbs_set_subscription_state_changed(cb,blfSubscriptionCb);
     linphone_core_add_callbacks(core_,cb); linphone_core_cbs_unref(cb);
     linphone_core_set_user_agent(core_,"Stel",STEL_VERSION);
     linphone_core_verify_server_certificates(core_,TRUE);
@@ -222,7 +228,7 @@ bool SipEngine::start(const Preferences &prefs,const QString &directory,bool tes
     // application usable so Settings can display and repair unavailable choices.
     if(!configureCodecs(false,prefs.audioCodecs,prefs.customAudioCodecs))emit notification(error_);
     if(!configureCodecs(true,prefs.videoCodecs,prefs.customVideoCodecs))emit notification(error_);
-    dnd_=prefs.dnd;if(!applyDevices(prefs))return false;iterate_.start();return true;
+    dnd_=prefs.dnd;if(!applyDevices(prefs))return false;iterate_.start();blfRetry_.start();return true;
 }
 bool SipEngine::addAccount(const Account &a) {
     if(!core_)return fail("Engine is not running.");
@@ -247,6 +253,7 @@ bool SipEngine::addAccount(const Account &a) {
         connect(child,&SipEngine::callFinished,this,&SipEngine::callFinished);
         connect(child,&SipEngine::messageChanged,this,&SipEngine::messageChanged);
         connect(child,&SipEngine::faxChanged,this,&SipEngine::faxChanged);
+        connect(child,&SipEngine::blfChanged,this,[this](const BlfInfo &info){blfInfos_[info.key]=info;emit blfChanged(info);});
         connect(child,&SipEngine::notification,this,&SipEngine::notification);
         connect(child,&SipEngine::errorOccurred,this,[this](const QString &s){fail(s);});
         if(!child->start(childPrefs,dataDirectory_+"/accounts/"+a.id,testMode_) || !child->addAccount(a)) {
@@ -339,6 +346,7 @@ bool SipEngine::setRegistration(const QString &id,bool enabled) {
     const int result=linphone_account_set_params(h.account,params);linphone_account_params_unref(params);
     if(result!=0)return fail("Could not update registration.");
     h.config.registerEnabled=enabled;
+    if(!enabled)syncBlf();
     if(!enabled && oldState!=LinphoneRegistrationOk && oldState!=LinphoneRegistrationProgress && oldState!=LinphoneRegistrationRefreshing)
         emit accountState(id,"Unregistered","Registration is off.");
     else emit accountState(id,enabled?"Registering":"Unregistering",enabled?"Sending REGISTER…":"Sending REGISTER with Expires: 0…");
@@ -370,6 +378,7 @@ bool SipEngine::removeAccount(const QString &id) {
     }
     if(!accounts_.contains(id))return false;
     for(auto *c:calls_)if(accountId(c)==id)return fail("End this account's calls before changing it.");
+    for(int n=0;n<expansionKeys_.size();++n)if(expansionKeys_[n].accountId==id){releaseBlf(n);setBlfState(n,BlfState::Unknown,"Account removed.");}
     const auto h=accounts_.take(id);
     linphone_core_remove_account(core_,h.account);
     linphone_account_unref(h.account);
@@ -871,6 +880,7 @@ void SipEngine::registrationCb(LinphoneCore *lc,LinphoneAccount *account,Linphon
     const QString id=str(linphone_account_params_get_idkey(linphone_account_get_params(account)));
     const auto *error=linphone_account_get_error_info(account);const int code=error?linphone_error_info_get_protocol_code(error):0;
     emit self->accountState(id,str(linphone_registration_state_to_string(state)),(code>0?"SIP "+QString::number(code)+" • ":QString())+str(message));
+    QTimer::singleShot(0,self,&SipEngine::syncBlf);
 }
 void SipEngine::callCb(LinphoneCore *lc,LinphoneCall *c,LinphoneCallState state,const char *message) {
     auto *self=static_cast<SipEngine*>(linphone_core_get_user_data(lc)); if(!self)return;

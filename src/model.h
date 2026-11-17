@@ -23,6 +23,16 @@ struct Account {
     static Account fromJson(const QJsonObject &);
     QString validate() const;
 };
+constexpr int ExpansionKeyCount = 12;
+struct ExpansionKey {
+    QString type = "disabled", label, accountId, target;
+    QJsonObject toJson() const;
+    static ExpansionKey fromJson(const QJsonObject &);
+    QString validate() const;
+    bool operator==(const ExpansionKey &other) const {
+        return type==other.type && label==other.label && accountId==other.accountId && target==other.target;
+    }
+};
 struct Preferences {
     QString caFile, inputDevice, outputDevice, videoDevice;
     QString signallingAddress, mediaAddress;
@@ -32,6 +42,7 @@ struct Preferences {
     bool dnd = false;
     bool customAudioCodecs = false, customVideoCodecs = false;
     QStringList audioCodecs, videoCodecs; // Enabled codec IDs, in offer preference order.
+    QVector<ExpansionKey> expansionKeys = QVector<ExpansionKey>(ExpansionKeyCount);
     QJsonObject toJson() const;
     static Preferences fromJson(const QJsonObject &);
     QString validate() const;

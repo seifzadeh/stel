@@ -9,14 +9,17 @@ class QPlainTextEdit;
 class QPushButton;
 class QTabWidget;
 namespace stel {
+class ExpansionWidget;
 QString registrationLabel(const QString &state);
 class SettingsWidget : public QWidget {
     Q_OBJECT
 public:
     SettingsWidget(SipEngine &,QVector<Account> &,Preferences &,Store &,bool canSave,QWidget *parent=nullptr);
     void openAccounts();
+    void openExpansion(int key=-1);
 signals:
     void accountsChanged();
+    void expansionChanged();
 private:
     SipEngine &engine_;
     QVector<Account> &accounts_;
@@ -24,6 +27,7 @@ private:
     Store &store_;
     bool canSave_;
     QTabWidget *pages_;
+    ExpansionWidget *expansion_;
     QListWidget *list_;
     AccountEditor *editor_;
     QPushButton *saveAccount_, *register_, *unregister_, *remove_;

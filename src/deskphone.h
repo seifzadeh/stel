@@ -35,9 +35,13 @@ public:
     void dockFax(QWidget *);
     void refresh(const CallInfo &,int callCount,int registered,int accounts,int unread,int faxCount,bool faxBusy);
     void place(QWidget *,QRectF,qreal fontSize=0);
+    void setExpansionKeys(const QVector<ExpansionKey> &);
+    void setExpansionState(const BlfInfo &);
     qreal scale() const{return scale_;}
 signals:
     void digitPressed(QChar);
+    void expansionPressed(int key);
+    void expansionConfigureRequested(int key);
 protected:
     void paintEvent(QPaintEvent *) override;
     void resizeEvent(QResizeEvent *) override;
@@ -55,6 +59,7 @@ private:
     QSize initialSize_;
     bool resizing_=false;
     DeskButton *navigation_[5],*idleLines_[2],*sip_,*faxStatus_;
+    QPushButton *expansion_[ExpansionKeyCount];
     CallInfo call_;
     int registered_=0,accounts_=0,callCount_=0;
     QWidget *fax_=nullptr;

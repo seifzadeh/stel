@@ -57,7 +57,7 @@ def main():
     executable = args.build.resolve() / 'stel'
     shutil.copy2(executable, output / 'stel')
     if args.include_tests:
-        for name in ('stel_probe', 'stel_tests', 'stel_paging_tests', 'stel_ui_tests', 'stel_fax_tests', 'stel_fax_document_tests'):
+        for name in ('stel_probe', 'stel_tests', 'stel_paging_tests', 'stel_blf_tests', 'stel_ui_tests', 'stel_fax_tests', 'stel_fax_document_tests'):
             if (args.build / name).exists():
                 shutil.copy2(args.build / name, output / 'bin' / name)
     if shutil.which('strip'):

@@ -93,6 +93,7 @@ QIcon navigationIcon(NavigationIcon icon){return QIcon(new NavigationIconEngine(
 void styleNavigationTabs(QTabWidget *pages,NavigationLevel level){
     auto *bar=pages->tabBar();bar->setDrawBase(false);bar->setExpanding(false);bar->setUsesScrollButtons(true);bar->setElideMode(Qt::ElideNone);
     const bool compact=level==NavigationLevel::Compact,settings=level==NavigationLevel::Settings;
+    const bool manySettings=settings&&pages->count()>6;
     pages->setIconSize(QSize(compact?17:settings?23:21,compact?17:settings?23:21));
     bar->setStyleSheet(QString(R"(
         QTabBar { background:transparent; border:0; }
@@ -106,7 +107,7 @@ void styleNavigationTabs(QTabWidget *pages,NavigationLevel level){
         QTabBar::tab:disabled { color:#a4b1ba; background:#edf1f4; border-color:#e4eaee; }
         QTabBar::scroller { width:28px; }
     )").arg(settings?"#ffffff":"#eaf0f4",settings?"#dbe5eb":"#e1e9ee")
-       .arg(compact?7:10).arg(compact?7:settings?12:10).arg(compact?11:settings?16:17).arg(compact?5:7).arg(compact?18:settings?26:22));
+       .arg(compact?7:10).arg(compact?7:manySettings?9:settings?12:10).arg(compact?11:manySettings?12:settings?16:17).arg(compact?5:7).arg(compact?18:settings?26:22));
     pages->setStyleSheet(QString("QTabWidget#%1::pane { border:1px solid #d7e3e9; border-radius:%2px; background:#fafcfd; margin-top:%3px; }")
         .arg(pages->objectName()).arg(compact?8:11).arg(compact?6:9));
 }

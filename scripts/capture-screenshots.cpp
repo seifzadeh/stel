@@ -72,6 +72,8 @@ int main(int argc,char **argv){
             account.domain="localhost";account.server=pbx.server();account.transport="udp";account.ice=false;
             account.password="stel-local-screenshot-demo";accounts<<account;
         }
+        const QStringList keyLabels={"Office","Support","Reception","Sales","Warehouse","Manager","Tech","Dispatch","Meeting","Voicemail","Mobile","Helpdesk"};
+        for(int n=0;n<ExpansionKeyCount;++n)prefs.expansionKeys[n]={n<2?"blf":"speed-dial",keyLabels[n],accounts[n%2].id,n<2?QString::number(1001+n):QString::number(1100+n)};
         QString error;require(store.save(accounts,prefs,&error),qPrintable(error));
         require(store.saveContacts({{{"name","Office"},{"uri","1001"}},
             {{"name",QString::fromUtf8("پشتیبانی / Support")},{"uri","1002"}}}),"Cannot save demo contacts");
@@ -154,7 +156,12 @@ int main(int argc,char **argv){
         require(engine->dial(accounts[0].id,"1002",false),"Cannot place the main-screen demo call");
         waitFor([&]{return callDialog(window,true);},"Main-screen incoming call did not open");
         child<QPushButton>(*callDialog(window,true),"callAnswer")->click();waitFor([&]{return running(*engine);},"Main-screen call did not connect");
+        pbx.notifyBlf("1002","<dialog-info xmlns=\"urn:ietf:params:xml:ns:dialog-info\" version=\"1\" state=\"full\" entity=\"sip:1002@localhost\"><dialog id=\"demo-call\"><state>confirmed</state></dialog></dialog-info>");
+        pbx.notifyBlf("1001","<dialog-info xmlns=\"urn:ietf:params:xml:ns:dialog-info\" version=\"1\" state=\"full\" entity=\"sip:1001@localhost\"><dialog id=\"demo-call\"><state>confirmed</state></dialog></dialog-info>");
+        waitFor([&]{return engine->blfInfo(0).state==BlfState::Busy&&engine->blfInfo(1).state==BlfState::Busy;},"BLF busy notification did not arrive");
         QTest::qWait(1200);capture(window,"main-window");hangup();
+        pbx.notifyBlf("1002","<dialog-info xmlns=\"urn:ietf:params:xml:ns:dialog-info\" version=\"2\" state=\"full\" entity=\"sip:1002@localhost\"/>");
+        pbx.notifyBlf("1001","<dialog-info xmlns=\"urn:ietf:params:xml:ns:dialog-info\" version=\"2\" state=\"full\" entity=\"sip:1001@localhost\"/>");
         pbx.incomingInviteHeaders={{"Alert-Info","<sip:pbx@localhost>;info=alert-autoanswer;delay=0"}};
         require(engine->dial(accounts[0].id,"1002",false),"Cannot place the demo page");
         waitFor([&]{return running(*engine);},"Demo page did not auto-answer");
@@ -166,8 +173,8 @@ int main(int argc,char **argv){
 
         window.showSettings();auto *settings=child<QDialog>(window,"settingsDialog");settings->resize(1080,900);
         auto *settingsPages=child<QTabWidget>(*settings,"settingsPages");
-        for(const auto &entry:QList<QPair<int,QString>>{{0,"accounts"},{1,"codecs"},{2,"video-codecs"},{3,"network"},{4,"security"},{5,"about"}}){
-            settings->resize(1080,entry.first==0||entry.first==5?900:800);settingsPages->setCurrentIndex(entry.first);
+        for(const auto &entry:QList<QPair<int,QString>>{{0,"accounts"},{1,"codecs"},{2,"video-codecs"},{3,"network"},{4,"security"},{5,"expansion"},{6,"about"}}){
+            settings->resize(1080,entry.first==0||entry.first==6?900:800);settingsPages->setCurrentIndex(entry.first);
             if(entry.first==1){
                 auto *codecs=child<QListWidget>(*settings,"audioCodecs");QListWidgetItem *g729=nullptr;
                 for(int n=0;n<codecs->count();++n)if(codecs->item(n)->data(Qt::UserRole).toString().startsWith("g729/"))g729=codecs->item(n);

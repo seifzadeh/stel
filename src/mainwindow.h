@@ -51,6 +51,8 @@ private:
     QHash<QString,QPointer<CallDialog>> callDialogs_;
     QHash<QString,QString> accountStates_;
     void rebuildAccounts();
+    void refreshExpansion();
+    void configureExpansion(int);
     void save();
     void updateCall(const CallInfo &);
     void updateControls();

@@ -76,6 +76,30 @@ void DeskButton::paintEvent(QPaintEvent *){
     if(hasFocus()){p.setBrush(Qt::NoBrush);p.setPen(QPen(QColor("#92d8ff"),1,Qt::DotLine));p.drawRoundedRect(r.adjusted(4,4,-4,-4),5,5);}
 }
 namespace {
+class ExpansionButton : public QPushButton {
+public:
+    explicit ExpansionButton(QWidget *parent):QPushButton(parent){setFlat(true);setCursor(Qt::PointingHandCursor);setContextMenuPolicy(Qt::CustomContextMenu);}
+protected:
+    void paintEvent(QPaintEvent *) override {
+        QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.scale(width()/85.,height()/44.);
+        QLinearGradient rim(0,0,0,44);rim.setColorAt(0,QColor("#f0f3f6"));rim.setColorAt(.2,QColor("#292e37"));rim.setColorAt(1,QColor("#0d1016"));
+        p.setBrush(rim);p.setPen(QColor("#171c24"));p.drawRoundedRect(QRectF(1,1,83,42),6,6);
+        QLinearGradient face(0,3,0,41);face.setColorAt(0,QColor(isDown()?"#1c2734":"#4d545e"));face.setColorAt(.4,QColor("#303640"));face.setColorAt(1,QColor("#1e242d"));
+        p.setBrush(face);p.setPen(QColor(220,232,247,60));p.drawRoundedRect(QRectF(4,4,77,36),4,4);
+        const auto type=property("keyType").toString();const auto state=static_cast<BlfState>(property("blfState").toInt());
+        QColor lamp=type=="speed-dial"?QColor("#32baff"):type!="blf"?QColor("#59616c"):
+            state==BlfState::Idle?QColor("#43ec51"):state==BlfState::Busy||state==BlfState::Ringing?QColor("#ff484f"):
+            state==BlfState::Subscribing?QColor("#e4b04c"):QColor("#7a8593");
+        if(state==BlfState::Ringing&&(QDateTime::currentMSecsSinceEpoch()/450)%2)lamp=lamp.darker(350);
+        if(type!="disabled"){p.setPen(QPen(QColor(lamp.red(),lamp.green(),lamp.blue(),60),6,Qt::SolidLine,Qt::RoundCap));p.drawLine(QPointF(30,8),QPointF(55,8));}
+        p.setPen(QPen(lamp,2.5,Qt::SolidLine,Qt::RoundCap));p.drawLine(QPointF(30,8),QPointF(55,8));
+        QFont font("Segoe UI");font.setPixelSize(12);font.setBold(true);p.setFont(font);p.setPen(QColor(type=="disabled"?"#acb4be":"#f4f8ff"));
+        p.drawText(QRectF(7,12,71,16),Qt::AlignCenter,QFontMetrics(font).elidedText(property("keyLabel").toString(),Qt::ElideRight,71));
+        font.setPixelSize(9);font.setBold(false);p.setFont(font);p.setPen(QColor("#c3d1e1"));
+        const auto target=property("keyTarget").toString();p.drawText(QRectF(7,28,71,12),Qt::AlignCenter,QFontMetrics(font).elidedText(target.isEmpty()?QString("Configure"):target,Qt::ElideRight,71));
+        if(underMouse()||hasFocus()){p.setPen(QPen(QColor("#68c7ff"),1));p.setBrush(Qt::NoBrush);p.drawRoundedRect(QRectF(3,3,79,38),5,5);}
+    }
+};
 class LineDelegate : public QStyledItemDelegate {
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
@@ -97,7 +121,13 @@ DeskPhone::DeskPhone(QWidget *parent):QWidget(parent),chassis_(":/desk/chassis.p
     pages=new QTabWidget(this);pages->blockSignals(true);pages->setObjectName("mainPages");pages->tabBar()->hide();pages->setStyleSheet("QTabWidget#mainPages::pane {border:0;background:transparent;} QTabWidget#mainPages>QWidget {background:transparent;}");place(pages,{502,168,492,276});
     const QStringList nav={"Phone","Fax","Contacts","Messages","Call History"};const int indices[]={0,2,3,1,4};const DeskIcon icons[]={DeskIcon::Phone,DeskIcon::Fax,DeskIcon::Contacts,DeskIcon::Messages,DeskIcon::History};
     for(int n=0;n<5;++n){auto *b=button(nav[n],icons[n],{297.,210.+46*n,205,44},DeskButton::Navigation);b->setObjectName("deskNav"+QString::number(n));b->horizontal=true;b->setCheckable(true);navigation_[n]=b;connect(b,&QPushButton::clicked,this,[this,n,indices]{pages->setCurrentIndex(indices[n]);navigation_[n]->setChecked(true);});
-        auto *led=button(nav[n],DeskIcon::None,{382.+188.5*n,480,95,31});led->caption.clear();led->setToolTip(nav[n]);connect(led,&QPushButton::clicked,b,&QPushButton::click);}
+    }
+    for(int n=0;n<ExpansionKeyCount;++n){
+        auto *key=new ExpansionButton(this);key->setObjectName("expansionKey"+QString::number(n));expansion_[n]=key;place(key,{291.+92*n,474,85,44});
+        connect(key,&QPushButton::clicked,this,[this,n]{emit expansionPressed(n);});
+        connect(key,&QWidget::customContextMenuRequested,this,[this,n](const QPoint &){emit expansionConfigureRequested(n);});
+    }
+    setExpansionKeys(QVector<ExpansionKey>(ExpansionKeyCount));
     connect(pages,&QTabWidget::currentChanged,this,[this,indices](int index){for(int n=0;n<5;++n)navigation_[n]->setChecked(index==indices[n]);arrange();update();});
     navigation_[0]->setChecked(true);
     auto *phone=new QWidget;phone->setObjectName("deskCallPage");pages->addTab(phone,"Phone");
@@ -125,10 +155,26 @@ DeskPhone::DeskPhone(QWidget *parent):QWidget(parent),chassis_(":/desk/chassis.p
     videoCall=button("Video call",DeskIcon::Video,{1007,368,111,65},DeskButton::Glass);videoCall->setObjectName("deskVideoCall");
     detail=new QLabel(this);detail->setObjectName("deskCallDetail");detail->hide();
     auto *timer=new QTimer(this);connect(timer,&QTimer::timeout,this,QOverload<>::of(&DeskPhone::update));timer->start(1000);
+    auto *blink=new QTimer(this);connect(blink,&QTimer::timeout,this,[this]{for(auto *key:expansion_)if(static_cast<BlfState>(key->property("blfState").toInt())==BlfState::Ringing)key->update();});blink->start(450);
     pages->blockSignals(false);
     setStyleSheet("QLineEdit#dialTarget, QComboBox#callAccount {color:#f2f7ff;background:rgba(8,29,55,125);border:1px solid #5786b6;border-radius:5px;padding:3px 8px;selection-background-color:#087fdf;} QComboBox#callAccount QAbstractItemView {background:#122c46;color:white;selection-background-color:#1769ac;}");
 }
 void DeskPhone::place(QWidget *w,QRectF r,qreal font){if(w->parentWidget()!=this)w->setParent(this);placements_.append({w,r,font});if(auto *b=dynamic_cast<DeskButton*>(w))b->designSize=r.size();}
+void DeskPhone::setExpansionKeys(const QVector<ExpansionKey> &keys){
+    for(int n=0;n<ExpansionKeyCount;++n){const auto key=keys.value(n);auto *button=expansion_[n];
+        const auto label=key.label.isEmpty()?key.target.isEmpty()?QString("Key %1").arg(n+1):key.target:key.label;
+        button->setText(label);button->setAccessibleName(QString("Expansion key %1: %2").arg(n+1).arg(label));
+        button->setProperty("keyType",key.type);button->setProperty("keyLabel",label);button->setProperty("keyTarget",key.target);
+        button->setToolTip(QString("Key %1 · %2\n%3\nRight-click to configure").arg(n+1).arg(key.type=="blf"?"BLF":key.type=="speed-dial"?"Speed Dial":"Disabled",key.target));button->update();
+    }
+}
+void DeskPhone::setExpansionState(const BlfInfo &info){
+    if(info.key<0||info.key>=ExpansionKeyCount)return;
+    auto *button=expansion_[info.key];
+    button->setProperty("blfState",static_cast<int>(info.state));button->setAccessibleDescription(blfStateLabel(info.state)+" · "+info.detail);
+    if(button->property("keyType")=="blf")button->setToolTip(button->property("keyLabel").toString()+" · "+blfStateLabel(info.state)+"\n"+info.detail+"\nClick to call · Right-click to configure");
+    button->update();
+}
 void DeskPhone::dockFax(QWidget *w){fax_=w;place(w,{866,549,539,410});arrange();}
 void DeskPhone::resizeEvent(QResizeEvent *){arrange();}
 void DeskPhone::arrange(){
@@ -148,6 +194,7 @@ void DeskPhone::refresh(const CallInfo &call,int count,int registered,int accoun
 }
 void DeskPhone::paintEvent(QPaintEvent *){
     QPainter p(this);p.setRenderHint(QPainter::Antialiasing);p.setRenderHint(QPainter::SmoothPixmapTransform);p.fillRect(rect(),QColor("#dce0e6"));p.translate(offset_);p.scale(scale_,scale_);p.drawPixmap(QRectF(0,0,1448,1086),chassis_,QRectF(chassis_.rect()));
+    QLinearGradient expansionTrim(0,471,0,522);expansionTrim.setColorAt(0,QColor("#e4e6e9"));expansionTrim.setColorAt(.5,QColor("#b3b8c0"));expansionTrim.setColorAt(1,QColor("#d4d7dc"));p.setBrush(expansionTrim);p.setPen(QColor("#9298a2"));p.drawRoundedRect(QRectF(280,471,1122,51),6,6);
     const auto text=[&](QRectF r,QString value,int size=18,bool bold=false,QColor c=QColor("#eef5ff"),int flags=Qt::AlignLeft|Qt::AlignVCenter){QFont f("Segoe UI");f.setPixelSize(size);f.setBold(bold);p.setFont(f);p.setPen(c);p.drawText(r,flags,value);};
     const auto time=QDateTime::currentDateTime();const auto clock=time.toString("h:mm AP").section(' ',0,0);
     text({316,118,193,48},clock,46);const auto suffixX=316+QFontMetricsF(p.font()).horizontalAdvance(clock)+9;
