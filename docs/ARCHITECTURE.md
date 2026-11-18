@@ -166,3 +166,18 @@ bounded; only explicit prepared documents and completed fax files are downloadab
 The compatibility dispatcher accepts selected Yealink HTTP Action URI names;
 JSON resources and a bounded cursor-based event journal expose additional Stel
 operations. See [API.md](API.md) for the supported commands and response contract.
+
+
+## Window geometry
+
+`WindowLayout` uses logical screen work areas, accounts for window decorations
+and keeps default windows compact. It recovers off-screen positions and updates
+limits when screens/work areas change, while allowing normal cross-monitor dragging.
+Qt 5 and Qt 6 use PassThrough DPI rounding; DPI awareness remains enabled.
+Settings pages have independent scroll containers and a separate fixed footer.
+`UiScale` applies a single 0.5 factor to nominal window sizes, form dimensions,
+stylesheets and fonts. A proxy style scales the platform metrics for native
+controls, menus and scrollbars. Phone/fax painter coordinates keep their design
+space and scale with the smaller widgets. DPI scaling remains independent.
+`stel_layout_tests` runs the actual widgets at seven scale factors in both
+platform CI jobs. See [DISPLAY.md](DISPLAY.md).

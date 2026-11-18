@@ -6,7 +6,7 @@
 Stel brings your PBX accounts to the desktop. Make voice and video calls,
 exchange messages, and send or receive faxes from a Qt/C++ application.
 
-![Stel desktop](website/assets/screenshots/v0.15.0/main-window.png)
+![Stel desktop](website/assets/screenshots/v0.15.1/main-window.png)
 
 [All pages](docs/SCREENSHOTS.md#captured-pages) · [Website gallery](https://seifzadeh.github.io/stel/?lang=en#screenshots)
 
@@ -49,6 +49,8 @@ exchange messages, and send or receive faxes from a Qt/C++ application.
    by default, with SRTP available as an account setting.
 
 Also included:
+
+- [Half-size interface](docs/DISPLAY.md): smaller windows, text and controls, with Windows display scaling support.
 
 - [Remote Control API](docs/API.md): Yealink Action URI commands plus JSON control
   for calls, accounts, messages, fax, BLF and status. Enable it in Settings → Remote API.

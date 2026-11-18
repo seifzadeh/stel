@@ -13,6 +13,7 @@ class QSystemTrayIcon;
 class QDialog;
 class QCloseEvent;
 class QKeyEvent;
+class QScrollArea;
 namespace stel {
 class SettingsWidget;
 class RemoteControlServer;
@@ -52,6 +53,7 @@ private:
     ChatWidget *chat_ = nullptr;
     FaxWidget *fax_ = nullptr;
     QDialog *settingsDialog_ = nullptr;
+    QScrollArea *settingsScroll_=nullptr;
     QHash<QString,CallInfo> callCache_;
     QHash<QString,QPointer<CallDialog>> callDialogs_;
     QHash<QString,QString> accountStates_;

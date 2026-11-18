@@ -1,3 +1,4 @@
+#include "windowlayout.h"
 #include "deskphone.h"
 #include "calldialog.h"
 #include "branding.h"
@@ -114,13 +115,13 @@ public:
 };
 }
 DeskPhone::DeskPhone(QWidget *parent):QWidget(parent),chassis_(":/desk/chassis.png"){
-    setObjectName("deskPhone");setMinimumSize(1000,750);setMouseTracking(true);
+    setObjectName("deskPhone");setMinimumSize(uiPixels(320),uiPixels(240));setMouseTracking(true);
     const auto button=[this](QString text,DeskIcon icon,QRectF rect,DeskButton::Face face=DeskButton::Physical){auto *b=new DeskButton(text,icon,this,face);place(b,rect);return b;};
     settings=button("Settings",DeskIcon::Settings,{1114,38,103,50});settings->caption.clear();settings->setToolTip("Settings");settings->setObjectName("openSettings");
     auto *min=button("Minimize",DeskIcon::Minimize,{1218,38,66,50});min->caption.clear();connect(min,&QPushButton::clicked,this,[this]{window()->showMinimized();});
     auto *max=button("Maximize",DeskIcon::Maximize,{1284,38,61,50});max->caption.clear();connect(max,&QPushButton::clicked,this,[this]{window()->isMaximized()?window()->showNormal():window()->showMaximized();});
     auto *close=button("Close",DeskIcon::Close,{1345,38,64,50});close->caption.clear();connect(close,&QPushButton::clicked,this,[this]{window()->close();});
-    pages=new QTabWidget(this);pages->blockSignals(true);pages->setObjectName("mainPages");pages->tabBar()->hide();pages->setStyleSheet("QTabWidget#mainPages::pane {border:0;background:transparent;} QTabWidget#mainPages>QWidget {background:transparent;}");place(pages,{502,168,492,276});
+    pages=new QTabWidget(this);pages->blockSignals(true);pages->setObjectName("mainPages");pages->tabBar()->hide();pages->setStyleSheet(uiStyleSheet("QTabWidget#mainPages::pane {border:0;background:transparent;} QTabWidget#mainPages>QWidget {background:transparent;}"));place(pages,{502,168,492,276});
     const QStringList nav={"Phone","Fax","Contacts","Messages","Call History"};const int indices[]={0,2,3,1,4};const DeskIcon icons[]={DeskIcon::Phone,DeskIcon::Fax,DeskIcon::Contacts,DeskIcon::Messages,DeskIcon::History};
     for(int n=0;n<5;++n){auto *b=button(nav[n],icons[n],{297.,210.+46*n,205,44},DeskButton::Navigation);b->setObjectName("deskNav"+QString::number(n));b->horizontal=true;b->setCheckable(true);navigation_[n]=b;connect(b,&QPushButton::clicked,this,[this,n,indices]{pages->setCurrentIndex(indices[n]);navigation_[n]->setChecked(true);});
     }
@@ -137,7 +138,7 @@ DeskPhone::DeskPhone(QWidget *parent):QWidget(parent),chassis_(":/desk/chassis.p
     account=new QComboBox(this);account->setObjectName("callAccount");place(account,{632,311,343,31},14);
     status=new QLabel(this);status->setObjectName("accountStatus");status->hide();
     calls=new QListWidget(this);calls->setItemDelegate(new LineDelegate(calls));calls->setObjectName("activeCalls");calls->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);calls->setTextElideMode(Qt::ElideRight);place(calls,{1152,162,237,127},16);
-    calls->setStyleSheet("QListWidget {background:transparent;border:0;padding:0;color:white;} QListWidget::item {padding:0;margin:0;border:0;background:transparent;}");
+    calls->setStyleSheet(uiStyleSheet("QListWidget {background:transparent;border:0;padding:0;color:white;} QListWidget::item {padding:0;margin:0;border:0;background:transparent;}"));
     for(int n=0;n<2;++n){idleLines_[n]=button("Line "+QString::number(n+1)+"   ·   Idle",DeskIcon::Phone,{1152.,162.+67*n,237,58},DeskButton::Glass);idleLines_[n]->horizontal=true;idleLines_[n]->caption="Line "+QString::number(n+1);idleLines_[n]->subcaption="Idle";idleLines_[n]->setProperty("statusDot",QColor("#8494a6"));connect(idleLines_[n],&QPushButton::clicked,this,[this]{pages->setCurrentIndex(0);target->setFocus();});}
     calls->raise();
     sip_=button("SIP",DeskIcon::Network,{1152,298,237,58},DeskButton::Glass);sip_->horizontal=true;connect(sip_,&QPushButton::clicked,settings,&QPushButton::click);
@@ -159,16 +160,16 @@ DeskPhone::DeskPhone(QWidget *parent):QWidget(parent),chassis_(":/desk/chassis.p
     forward=button("Forward",DeskIcon::None,{632,328,99,29},DeskButton::Glass);forward->setObjectName("deskForward");
     attended=button("Attended",DeskIcon::None,{740,328,120,29},DeskButton::Glass);attended->setObjectName("deskAttendedTransfer");attended->setToolTip("Attended transfer");
     receiveFax=button("Fax",DeskIcon::None,{869,328,106,29},DeskButton::Glass);receiveFax->setObjectName("deskReceiveFax");
-    dtmfDisplay=new QLabel(this);dtmfDisplay->setObjectName("deskDtmfDisplay");dtmfDisplay->setStyleSheet("color:#ccefff;background:transparent;");place(dtmfDisplay,{521,329,101,25},13);
-    callMessage=new QLabel(this);callMessage->setObjectName("deskCallMessage");callMessage->setTextFormat(Qt::PlainText);callMessage->setStyleSheet("color:#ffd0b8;background:transparent;");place(callMessage,{511,437,613,18},12);
+    dtmfDisplay=new QLabel(this);dtmfDisplay->setObjectName("deskDtmfDisplay");dtmfDisplay->setStyleSheet(uiStyleSheet("color:#ccefff;background:transparent;"));place(dtmfDisplay,{521,329,101,25},13);
+    callMessage=new QLabel(this);callMessage->setObjectName("deskCallMessage");callMessage->setTextFormat(Qt::PlainText);callMessage->setStyleSheet(uiStyleSheet("color:#ffd0b8;background:transparent;"));place(callMessage,{511,437,613,18},12);
     remoteVideo=new VideoView(this);remoteVideo->setObjectName("deskRemoteVideo");remoteVideo->setCursor(Qt::PointingHandCursor);remoteVideo->setToolTip("Click to open the video call window");place(remoteVideo,{1002,185,126,95});
     previewVideo=new VideoView(this);previewVideo->setObjectName("deskPreviewVideo");previewVideo->setCursor(Qt::PointingHandCursor);place(previewVideo,{1056,306,72,49});
-    videoCaption_=new QLabel("Video ↗",this);videoCaption_->setAlignment(Qt::AlignCenter);videoCaption_->setStyleSheet("color:#daf0ff;background:transparent;");place(videoCaption_,{1002,282,126,21},12);
+    videoCaption_=new QLabel("Video ↗",this);videoCaption_->setAlignment(Qt::AlignCenter);videoCaption_->setStyleSheet(uiStyleSheet("color:#daf0ff;background:transparent;"));place(videoCaption_,{1002,282,126,21},12);
     callHost=new InlineCallHost(this);place(callHost,{504,215,624,220});
     auto *timer=new QTimer(this);connect(timer,&QTimer::timeout,this,QOverload<>::of(&DeskPhone::update));timer->start(1000);
     auto *blink=new QTimer(this);connect(blink,&QTimer::timeout,this,[this]{for(auto *key:expansion_)if(static_cast<BlfState>(key->property("blfState").toInt())==BlfState::Ringing)key->update();});blink->start(450);
     pages->blockSignals(false);
-    setStyleSheet("QLineEdit#dialTarget, QComboBox#callAccount {color:#f2f7ff;background:rgba(8,29,55,125);border:1px solid #5786b6;border-radius:5px;padding:3px 8px;selection-background-color:#087fdf;} QComboBox#callAccount QAbstractItemView {background:#122c46;color:white;selection-background-color:#1769ac;}");
+    setStyleSheet(uiStyleSheet("QLineEdit#dialTarget, QComboBox#callAccount {color:#f2f7ff;background:rgba(8,29,55,125);border:1px solid #5786b6;border-radius:5px;padding:1px 4px;selection-background-color:#087fdf;} QComboBox#callAccount QAbstractItemView {background:#122c46;color:white;selection-background-color:#1769ac;}"));
 }
 void DeskPhone::place(QWidget *w,QRectF r,qreal font){if(w->parentWidget()!=this)w->setParent(this);placements_.append({w,r,font});if(auto *b=dynamic_cast<DeskButton*>(w))b->designSize=r.size();}
 void DeskPhone::setExpansionKeys(const QVector<ExpansionKey> &keys){
@@ -190,7 +191,7 @@ void DeskPhone::dockFax(QWidget *w){fax_=w;place(w,{866,549,539,410});arrange();
 void DeskPhone::resizeEvent(QResizeEvent *){arrange();}
 void DeskPhone::arrange(){
     scale_=qMin(width()/1448.,height()/1086.);offset_={(width()-1448*scale_)/2,(height()-1086*scale_)/2};
-    for(const auto &i:placements_){QRectF r=i.rect;if(i.widget==pages&&pages->currentIndex()!=0)r={505,167,623,278};if(i.widget==calls)r.setHeight(qMin(2,callCount_)*67);i.widget->setGeometry(QRect(qRound(offset_.x()+r.x()*scale_),qRound(offset_.y()+r.y()*scale_),qRound(r.width()*scale_),qRound(r.height()*scale_)));if(i.font){auto f=i.widget->font();f.setPixelSize(qMax(9,qRound(i.font*scale_)));i.widget->setFont(f);}}
+    for(const auto &i:placements_){QRectF r=i.rect;if(i.widget==pages&&pages->currentIndex()!=0)r={505,167,623,278};if(i.widget==calls)r.setHeight(qMin(2,callCount_)*67);i.widget->setGeometry(QRect(qRound(offset_.x()+r.x()*scale_),qRound(offset_.y()+r.y()*scale_),qRound(r.width()*scale_),qRound(r.height()*scale_)));if(i.font){auto f=i.widget->font();f.setPixelSize(qMax(uiPixels(7),qRound(i.font*scale_)));i.widget->setFont(f);}}
     target->setVisible(pages->currentIndex()==0&&call_.id.isEmpty());account->setVisible(pages->currentIndex()==0&&call_.id.isEmpty());
     for(auto *b:{addCall,conference,record,openCall})b->setVisible(pages->currentIndex()==0);
     findChild<DeskButton*>("deskAction0")->setVisible(pages->currentIndex()==0);findChild<DeskButton*>("deskAction1")->setVisible(pages->currentIndex()==0);videoCall->setVisible(pages->currentIndex()==0);

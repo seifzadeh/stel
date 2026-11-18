@@ -1,3 +1,4 @@
+#include "windowlayout.h"
 #include "settingswidget.h"
 #include "codecselector.h"
 #include "expansionwidget.h"
@@ -44,14 +45,16 @@ static QColor stateColor(const QString &state) {
 static QIcon dotIcon(const QString &state) {
     QPixmap pixmap(18,18);pixmap.fill(Qt::transparent);QPainter p(&pixmap);p.setRenderHint(QPainter::Antialiasing);p.setPen(Qt::NoPen);p.setBrush(stateColor(state));p.drawEllipse(4,4,10,10);return QIcon(pixmap);
 }
-static QLabel *note(const QString &text) {auto *label=new QLabel(text);label->setWordWrap(true);label->setStyleSheet("color:#687b8a; font-size:11px;");return label;}
+static QLabel *note(const QString &text) {auto *label=new QLabel(text);label->setWordWrap(true);label->setStyleSheet(uiStyleSheet("color:#687b8a; font-size:11px;"));return label;}
 SettingsWidget::SettingsWidget(SipEngine &engine,QVector<Account> &accounts,Preferences &prefs,Store &store,bool canSave,QWidget *parent)
     :QWidget(parent),engine_(engine),accounts_(accounts),prefs_(prefs),store_(store),canSave_(canSave) {
-    setObjectName("settingsWidget");auto *layout=new QVBoxLayout(this);layout->setContentsMargins(12,12,12,12);
+    setObjectName("settingsWidget");auto *layout=new QVBoxLayout(this);layout->setContentsMargins(uiPixels(7),uiPixels(7),uiPixels(7),uiPixels(7));
     pages_=new QTabWidget;pages_->setObjectName("settingsPages");layout->addWidget(pages_);
     pages_->addTab(accountsPage(),navigationIcon(NavigationIcon::Accounts),"Accounts");pages_->addTab(audioPage(),navigationIcon(NavigationIcon::Audio),"Audio");pages_->addTab(videoPage(),navigationIcon(NavigationIcon::Video),"Video");pages_->addTab(networkPage(),navigationIcon(NavigationIcon::Network),"Network");pages_->addTab(securityPage(),navigationIcon(NavigationIcon::Security),"Security");pages_->addTab(aboutPage(),navigationIcon(NavigationIcon::Info),"About");
     expansion_=new ExpansionWidget(engine_,accounts_,prefs_,store_,canSave_,pages_);
     pages_->insertTab(5,expansion_,navigationIcon(NavigationIcon::General),"Expansion");
+    // Keep a tall page from forcing every other tab beyond the screen.
+    for(int n=0;n<pages_->count();++n){auto *content=pages_->widget(n);const auto title=pages_->tabText(n);const auto icon=pages_->tabIcon(n);pages_->removeTab(n);auto *scroll=new QScrollArea;scroll->setFrameShape(QFrame::NoFrame);scroll->setWidgetResizable(true);scroll->setWidget(content);pages_->insertTab(n,scroll,icon,title);}
     connect(expansion_,&ExpansionWidget::keysChanged,this,&SettingsWidget::expansionChanged);
     connect(this,&SettingsWidget::accountsChanged,expansion_,&ExpansionWidget::refreshAccounts);
     styleNavigationTabs(pages_,NavigationLevel::Settings);
@@ -67,17 +70,17 @@ SettingsWidget::SettingsWidget(SipEngine &engine,QVector<Account> &accounts,Pref
     rebuildList();if(list_->count())selectAccount(list_->item(0)->data(Qt::UserRole).toString());else updateAccountStatus();
 }
 void SettingsWidget::openAccounts(){pages_->setCurrentIndex(0);}
-void SettingsWidget::openExpansion(int key){pages_->setCurrentWidget(expansion_);expansion_->focusKey(key);}
+void SettingsWidget::openExpansion(int key){pages_->setCurrentIndex(5);expansion_->focusKey(key);}
 QWidget *SettingsWidget::accountsPage() {
-    auto *page=new QWidget;auto *layout=new QHBoxLayout(page);layout->setSpacing(14);
-    auto *left=new QVBoxLayout;left->addWidget(new QLabel("SIP accounts"));list_=new QListWidget;list_->setObjectName("settingsAccounts");list_->setMinimumWidth(185);list_->setMaximumWidth(235);left->addWidget(list_,1);
+    auto *page=new QWidget;auto *layout=new QHBoxLayout(page);layout->setSpacing(uiPixels(8));
+    auto *left=new QVBoxLayout;left->addWidget(new QLabel("SIP accounts"));list_=new QListWidget;list_->setObjectName("settingsAccounts");list_->setMinimumWidth(uiPixels(145));list_->setMaximumWidth(uiPixels(185));left->addWidget(list_,1);
     auto *add=new QPushButton("+ Add account");add->setObjectName("addAccount");remove_=new QPushButton("Remove account");remove_->setObjectName("removeAccount");left->addWidget(add);left->addWidget(remove_);layout->addLayout(left);
-    auto *right=new QVBoxLayout;auto *stateRow=new QHBoxLayout;registrationDot_=new QLabel;registrationDot_->setFixedSize(16,16);registrationDot_->setObjectName("registrationDot");registrationText_=new QLabel;registrationText_->setObjectName("registrationStatus");stateRow->addWidget(registrationDot_);stateRow->addWidget(registrationText_);stateRow->addStretch();right->addLayout(stateRow);
-    auto *scroll=new QScrollArea;scroll->setWidgetResizable(true);scroll->setFrameShape(QFrame::NoFrame);scroll->setStyleSheet("QScrollArea, QScrollArea > QWidget > QWidget {background:#fafcfd;}");editor_=new AccountEditor;editor_->setObjectName("accountEditor");scroll->setWidget(editor_);right->addWidget(scroll,1);
+    auto *right=new QVBoxLayout;auto *stateRow=new QHBoxLayout;registrationDot_=new QLabel;registrationDot_->setFixedSize(uiPixels(16),uiPixels(16));registrationDot_->setObjectName("registrationDot");registrationText_=new QLabel;registrationText_->setObjectName("registrationStatus");stateRow->addWidget(registrationDot_);stateRow->addWidget(registrationText_);stateRow->addStretch();right->addLayout(stateRow);
+    auto *scroll=new QScrollArea;scroll->setWidgetResizable(true);scroll->setFrameShape(QFrame::NoFrame);scroll->setStyleSheet(uiStyleSheet("QScrollArea, QScrollArea > QWidget > QWidget {background:#fafcfd;}"));editor_=new AccountEditor;editor_->setObjectName("accountEditor");scroll->setWidget(editor_);right->addWidget(scroll,1);
     auto *actions=new QHBoxLayout;saveAccount_=new QPushButton("Save account");saveAccount_->setObjectName("saveAccount");register_=new QPushButton("Register");register_->setObjectName("registerAccount");unregister_=new QPushButton("Unregister");unregister_->setObjectName("unregisterAccount");
-    actions->addWidget(saveAccount_);actions->addStretch();actions->addWidget(register_);actions->addWidget(unregister_);right->addLayout(actions);
+    actions->addWidget(saveAccount_);actions->addStretch();actions->addWidget(register_);actions->addWidget(unregister_);right->insertLayout(1,actions);
     accountNetwork_=note("");accountNetwork_->setObjectName("accountNetwork");right->addWidget(accountNetwork_);
-    response_=new QPlainTextEdit;response_->setObjectName("registrationResponse");response_->setReadOnly(true);response_->setMaximumHeight(65);response_->setPlaceholderText("Registration result and server response appear here.");right->addWidget(response_);layout->addLayout(right,1);
+    response_=new QPlainTextEdit;response_->setObjectName("registrationResponse");response_->setReadOnly(true);response_->setMaximumHeight(uiPixels(65));response_->setPlaceholderText("Registration result and server response appear here.");right->addWidget(response_);layout->addLayout(right,1);
     connect(add,&QPushButton::clicked,this,&SettingsWidget::addAccount);connect(remove_,&QPushButton::clicked,this,&SettingsWidget::removeAccount);
     connect(saveAccount_,&QPushButton::clicked,this,[this]{commitAccount(false);});connect(register_,&QPushButton::clicked,this,[this]{commitAccount(true);});
     connect(unregister_,&QPushButton::clicked,this,[this]{
@@ -104,12 +107,12 @@ void SettingsWidget::selectAccount(const QString &id) {
 }
 void SettingsWidget::updateAccountStatus() {
     const bool selected=!editingId_.isEmpty();editor_->setEnabled(selected);saveAccount_->setEnabled(selected&&canSave_);remove_->setEnabled(selected&&canSave_);
-    const auto state=states_.value(editingId_);const auto label=registrationLabel(state);registrationText_->setText(selected?label:"Add an account to get started");registrationDot_->setStyleSheet("background:"+stateColor(state).name()+";border-radius:8px;");
+    const auto state=states_.value(editingId_);const auto label=registrationLabel(state);registrationText_->setText(selected?label:"Add an account to get started");registrationDot_->setStyleSheet(uiStyleSheet("background:"+stateColor(state).name()+";border-radius:8px;"));
     registrationDot_->setProperty("registered",state=="LinphoneRegistrationOk");
     const bool pending=state=="Registering"||state=="Unregistering"||state=="LinphoneRegistrationProgress"||state=="LinphoneRegistrationRefreshing";
     register_->setEnabled(selected&&canSave_&&!pending);unregister_->setEnabled(selected&&canSave_&&!pending&&state!="LinphoneRegistrationNone"&&state!="LinphoneRegistrationCleared"&&state!="Unregistered"&&state!="Disabled");
-    register_->setStyleSheet(state=="LinphoneRegistrationOk"?"QPushButton {background:#138e81;color:white;border:0;}":QString());
-    accountNetwork_->setText(selected?engine_.networkDescription(editingId_):QString());response_->setStyleSheet(state=="LinphoneRegistrationFailed"?"color:#b33748;":QString());response_->setPlainText(details_.value(editingId_));
+    register_->setStyleSheet(uiStyleSheet(state=="LinphoneRegistrationOk"?"QPushButton {background:#138e81;color:white;border:0;}":QString()));
+    accountNetwork_->setText(selected?engine_.networkDescription(editingId_):QString());accountNetwork_->setToolTip(accountNetwork_->text());response_->setStyleSheet(uiStyleSheet(state=="LinphoneRegistrationFailed"?"color:#b33748;":QString()));response_->setPlainText(details_.value(editingId_));
     if(!canSave_)report("The settings file is invalid; it has been preserved. Repair it before saving.",true);
 }
 void SettingsWidget::addAccount() {
@@ -135,7 +138,7 @@ bool SettingsWidget::persist(QString *error) {
     return store_.save(accounts_,prefs_,error);
 }
 void SettingsWidget::report(const QString &message,bool error) {
-    response_->setStyleSheet(error?"color:#b33748;":QString());response_->setPlainText(QTime::currentTime().toString("HH:mm:ss")+"  "+message);
+    response_->setStyleSheet(uiStyleSheet(error?"color:#b33748;":QString()));response_->setPlainText(QTime::currentTime().toString("HH:mm:ss")+"  "+message);
 }
 bool SettingsWidget::commitAccount(bool registerAfter) {
     auto a=editor_->account();int index=-1;for(int n=0;n<accounts_.size();++n)if(accounts_[n].id==a.id)index=n;
@@ -158,7 +161,7 @@ bool SettingsWidget::commitAccount(bool registerAfter) {
     return true;
 }
 QWidget *SettingsWidget::audioPage() {
-    auto *page=new QWidget;auto *form=new QFormLayout(page);form->setContentsMargins(20,20,20,20);form->setSpacing(14);
+    auto *page=new QWidget;auto *form=new QFormLayout(page);form->setContentsMargins(uiPixels(20),uiPixels(20),uiPixels(20),uiPixels(20));form->setSpacing(uiPixels(14));
     auto *input=new QComboBox;input->setObjectName("microphoneDevice");auto *output=new QComboBox;output->setObjectName("speakerDevice");
     input->addItem("System default","");input->addItem("Dummy mic — silence",dummyMicSilence());input->addItem("Dummy mic — 440 Hz test tone",dummyMicTone());
     output->addItem("System default","");output->addItem("Dummy speaker — discard audio",dummySpeaker());
@@ -172,7 +175,7 @@ QWidget *SettingsWidget::audioPage() {
     form->addRow(codecSettings(false));return page;
 }
 QWidget *SettingsWidget::videoPage() {
-    auto *page=new QWidget;auto *form=new QFormLayout(page);form->setContentsMargins(20,20,20,20);form->setSpacing(14);
+    auto *page=new QWidget;auto *form=new QFormLayout(page);form->setContentsMargins(uiPixels(20),uiPixels(20),uiPixels(20),uiPixels(20));form->setSpacing(uiPixels(14));
     auto *camera=new QComboBox;camera->setObjectName("cameraDevice");camera->addItem("System default","");camera->addItem("Dummy Camera — internal colour-bar chart",dummyCamera());
     for(const auto &id:engine_.videoDevices())if(!id.contains("Static",Qt::CaseInsensitive))camera->addItem(id,id);
     camera->setCurrentIndex(qMax(0,camera->findData(prefs_.videoDevice)));form->addRow("Camera",camera);form->addRow(note("Dummy Camera sends a built-in 640 × 480 test chart during video calls. No webcam or external image file is needed."));
@@ -193,7 +196,7 @@ QWidget *SettingsWidget::codecSettings(bool video) {
     });return widget;
 }
 QWidget *SettingsWidget::networkPage() {
-    auto *page=new QWidget;auto *layout=new QVBoxLayout(page);auto *scroll=new QScrollArea;scroll->setWidgetResizable(true);scroll->setFrameShape(QFrame::NoFrame);auto *content=new QWidget;auto *form=new QFormLayout(content);form->setContentsMargins(18,18,18,18);form->setSpacing(12);scroll->setWidget(content);layout->addWidget(scroll);
+    auto *page=new QWidget;auto *layout=new QVBoxLayout(page);auto *scroll=new QScrollArea;scroll->setWidgetResizable(true);scroll->setFrameShape(QFrame::NoFrame);auto *content=new QWidget;auto *form=new QFormLayout(content);form->setContentsMargins(uiPixels(18),uiPixels(18),uiPixels(18),uiPixels(18));form->setSpacing(uiPixels(12));scroll->setWidget(content);layout->addWidget(scroll);
     auto *signal=new QComboBox;signal->setObjectName("signallingAddress");auto *media=new QComboBox;media->setObjectName("mediaAddress");auto *refresh=new QPushButton("Refresh IP addresses");
     auto refreshIps=[=]{const auto oldSignal=signal->count()?signal->currentData().toString():prefs_.signallingAddress;const auto oldMedia=media->count()?media->currentData().toString():prefs_.mediaAddress;
         for(auto *combo:{signal,media}){const QSignalBlocker block(combo);const auto selected=combo==signal?oldSignal:oldMedia;combo->clear();combo->addItem("Automatic — OS routing","");for(const auto &local:localAddresses())combo->addItem(local.address+"  ·  "+local.interfaceName,local.address);if(!selected.isEmpty()&&combo->findData(selected)<0)combo->addItem(selected+" (unavailable)",selected);combo->setCurrentIndex(qMax(0,combo->findData(selected)));}};
@@ -209,9 +212,9 @@ QWidget *SettingsWidget::networkPage() {
         if(!engine_.applyNetwork(next)){result->setText(engine_.lastError());return;}prefs_=next;QString error;result->setText(persist(&error)?"Applied. "+engine_.networkDescription():error);updateAccountStatus();});return page;
 }
 QWidget *SettingsWidget::aboutPage() {
-    auto *page=new QWidget;page->setObjectName("aboutPage");auto *layout=new QVBoxLayout(page);layout->setContentsMargins(20,20,20,20);layout->setSpacing(14);
-    auto *heading=new QHBoxLayout;auto *logo=new QLabel;logo->setPixmap(applicationIcon().pixmap(64,64));heading->addWidget(logo);
-    auto *version=new QLabel("Stel "+QString::fromLatin1(STEL_VERSION));version->setObjectName("aboutVersion");version->setStyleSheet("font-size:24px; font-weight:600;");heading->addWidget(version);heading->addStretch();layout->addLayout(heading);
+    auto *page=new QWidget;page->setObjectName("aboutPage");auto *layout=new QVBoxLayout(page);layout->setContentsMargins(uiPixels(20),uiPixels(20),uiPixels(20),uiPixels(20));layout->setSpacing(uiPixels(8));
+    auto *heading=new QHBoxLayout;auto *logo=new QLabel;logo->setPixmap(applicationIcon().pixmap(uiSize({64,64})));heading->addWidget(logo);
+    auto *version=new QLabel("Stel "+QString::fromLatin1(STEL_VERSION));version->setObjectName("aboutVersion");version->setStyleSheet(uiStyleSheet("font-size:20px; font-weight:600;"));heading->addWidget(version);heading->addStretch();layout->addLayout(heading);
     auto *details=new QTextBrowser;details->setObjectName("aboutDetails");details->setOpenExternalLinks(true);details->setFrameShape(QFrame::NoFrame);
     details->setHtml(QString::fromUtf8(R"HTML(
 <p>A compact, open-source, multi-account SIP softphone for desktop computers.<br>
@@ -250,7 +253,7 @@ packaging and automated tests. GitHub Actions builds releases.</p>
 <a href="https://github.com/seifzadeh/stel/issues">Report an issue</a></p>
 )HTML").arg(QString::fromUtf8(linphone_core_get_version()).toHtmlEscaped(),QString::fromLatin1(qVersion()).toHtmlEscaped()));
     layout->addWidget(details,1);
-    auto *licenseTabs=new QTabWidget;licenseTabs->setObjectName("aboutLicenses");licenseTabs->setMaximumHeight(160);
+    auto *licenseTabs=new QTabWidget;licenseTabs->setObjectName("aboutLicenses");licenseTabs->setMaximumHeight(uiPixels(160));
     for(const auto &license:QStringList{"GPL-3.0","AGPL-3.0"}) {
         auto *text=new QTextBrowser;text->setObjectName("license"+license);QFile file(":/licenses/"+license+".txt");
         if(file.open(QIODevice::ReadOnly))text->setPlainText(QString::fromUtf8(file.readAll()));
@@ -260,7 +263,7 @@ packaging and automated tests. GitHub Actions builds releases.</p>
     layout->addWidget(licenseTabs);return page;
 }
 QWidget *SettingsWidget::securityPage() {
-    auto *page=new QWidget;auto *form=new QFormLayout(page);form->setContentsMargins(20,20,20,20);form->setSpacing(14);
+    auto *page=new QWidget;auto *form=new QFormLayout(page);form->setContentsMargins(uiPixels(20),uiPixels(20),uiPixels(20),uiPixels(20));form->setSpacing(uiPixels(14));
     auto *ca=new QLineEdit(prefs_.caFile);ca->setObjectName("trustedCa");ca->setPlaceholderText("Blank = system / bundled trust store");auto *row=new QWidget;auto *h=new QHBoxLayout(row);h->setContentsMargins(0,0,0,0);h->addWidget(ca);auto *browse=new QPushButton("Browse…");h->addWidget(browse);form->addRow("Trusted root CA bundle",row);
     connect(browse,&QPushButton::clicked,this,[=]{auto path=QFileDialog::getOpenFileName(this,"Select trusted CA bundle");if(!path.isEmpty())ca->setText(path);});form->addRow(note("TLS certificate and hostname checks are always enabled. Set each account's client certificate and media encryption in Accounts → Security. Restart Stel after changing the trusted CA bundle."));
     auto *apply=new QPushButton("Save security settings");auto *result=note("");form->addRow(apply);form->addRow(result);connect(apply,&QPushButton::clicked,this,[=]{const auto path=ca->text().trimmed();if(!path.isEmpty()&&!QFile::exists(path)){result->setText("CA file does not exist.");return;}prefs_.caFile=path;QString error;result->setText(persist(&error)?"Saved. Restart Stel to apply the CA bundle.":error);});

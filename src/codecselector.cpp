@@ -1,3 +1,4 @@
+#include "windowlayout.h"
 #include "codecselector.h"
 #include <QLabel>
 #include <QListWidget>
@@ -11,7 +12,7 @@ CodecSelector::CodecSelector(const QVector<CodecInfo> &inventory,bool video,bool
     :QGroupBox(video?"Video codecs":"Audio codecs",parent),inventory_(inventory),custom_(custom) {
     const QString prefix=video?"video":"audio";
     auto *layout=new QVBoxLayout(this);auto *hint=new QLabel("Tick the codecs to offer. The first checked codec has highest priority.\nBoth endpoints must support the negotiated codec.");hint->setWordWrap(true);layout->addWidget(hint);
-    list_=new QListWidget;list_->setObjectName(prefix+"Codecs");list_->setMinimumHeight(165);list_->setMaximumHeight(230);list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);layout->addWidget(list_);
+    list_=new QListWidget;list_->setObjectName(prefix+"Codecs");list_->setMinimumHeight(uiPixels(125));list_->setMaximumHeight(uiPixels(180));list_->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);layout->addWidget(list_);
     auto *actions=new QHBoxLayout;auto *up=new QPushButton("Move up");up->setObjectName(prefix+"CodecUp");auto *down=new QPushButton("Move down");down->setObjectName(prefix+"CodecDown");auto *reset=new QPushButton("Reset defaults");reset->setObjectName(prefix+"CodecDefaults");actions->addWidget(up);actions->addWidget(down);actions->addStretch();actions->addWidget(reset);layout->addLayout(actions);
     populate(!custom,selected);
     connect(list_,&QListWidget::itemChanged,this,[this]{custom_=true;});
@@ -20,7 +21,7 @@ CodecSelector::CodecSelector(const QVector<CodecInfo> &inventory,bool video,bool
     connect(reset,&QPushButton::clicked,this,[this]{populate(true);custom_=false;});
     if(video) {
         QStringList missing;for(const auto &mime:{"H265","VP9","AV1"}) {bool found=false;for(const auto &c:inventory)if(c.mime==mime&&c.available)found=true;if(!found)missing<<mime;}
-        if(!missing.isEmpty()){auto *label=new QLabel("Unavailable in this build: "+missing.join(", ")+". These need a compatible SDK encoder and decoder.");label->setWordWrap(true);label->setStyleSheet("color:#687b8a;font-size:11px;");layout->addWidget(label);}
+        if(!missing.isEmpty()){auto *label=new QLabel("Unavailable in this build: "+missing.join(", ")+". These need a compatible SDK encoder and decoder.");label->setWordWrap(true);label->setStyleSheet(uiStyleSheet("color:#687b8a;font-size:11px;"));layout->addWidget(label);}
     }
 }
 void CodecSelector::populate(bool defaults,const QStringList &selected) {

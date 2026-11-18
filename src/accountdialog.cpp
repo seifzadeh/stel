@@ -1,4 +1,6 @@
 #include "accountdialog.h"
+#include "windowlayout.h"
+#include <QScrollArea>
 #include "branding.h"
 #include <QCheckBox>
 #include <QComboBox>
@@ -20,7 +22,7 @@ AccountEditor::AccountEditor(QWidget *parent):QWidget(parent) {
     Account a;
     auto *layout=new QVBoxLayout(this); auto *tabs=new QTabWidget;tabs->setObjectName("accountTabs");layout->addWidget(tabs);
     styleNavigationTabs(tabs,NavigationLevel::Compact);
-    auto form=[&](const QString &title,NavigationIcon icon){auto *w=new QWidget;auto *f=new QFormLayout(w);f->setSpacing(6);tabs->addTab(w,navigationIcon(icon),title);return f;};
+    auto form=[&](const QString &title,NavigationIcon icon){auto *w=new QWidget;auto *f=new QFormLayout(w);f->setSpacing(uiPixels(6));tabs->addTab(w,navigationIcon(icon),title);return f;};
     auto edit=[&](QFormLayout *f,const QString &key,const QString &label,const QString &value,bool secret=false){
         auto *e=new QLineEdit(value);e->setObjectName(key); if(secret)e->setEchoMode(QLineEdit::Password); text_[key]=e; f->addRow(label,e); return e;
     };
@@ -85,9 +87,9 @@ void AccountEditor::setAccount(const Account &a) {
     transport_->setCurrentText(a.transport);encryption_->setCurrentIndex(encryption_->findData(a.encryption));expiry_->setValue(a.expires);dirty_=false;
 }
 AccountDialog::AccountDialog(const Account &a,QWidget *parent):QDialog(parent) {
-    setWindowTitle(a.id.isEmpty()?"Add SIP account":"Edit SIP account");resize(560,570);
-    auto *layout=new QVBoxLayout(this);editor_=new AccountEditor;editor_->setAccount(a);layout->addWidget(editor_);
-    auto *buttons=new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel);layout->addWidget(buttons);
+    setWindowTitle(a.id.isEmpty()?"Add SIP account":"Edit SIP account");setObjectName("accountDialog");resize(480,500);
+    auto *layout=new QVBoxLayout(this);editor_=new AccountEditor;editor_->setAccount(a);auto *scroll=new QScrollArea;scroll->setWidgetResizable(true);scroll->setFrameShape(QFrame::NoFrame);scroll->setWidget(editor_);layout->addWidget(scroll,1);
+    auto *buttons=new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel);layout->addWidget(buttons);manageWindowLayout(this,{480,500},{340,280});
     connect(buttons,&QDialogButtonBox::rejected,this,&QDialog::reject);
     connect(buttons,&QDialogButtonBox::accepted,this,[this]{auto error=account().validate();if(error.isEmpty())accept();else QMessageBox::warning(this,"Check account",error);});
 }

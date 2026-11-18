@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.15.1 — 2026-11-18
+
+- Halve the whole compact interface: phone 420 × 315, Settings 420 × 300
+  and call window 230 × 290. Scale fonts, icons, forms, controls and spacing
+  together while keeping fax documents at standard A4 size.
+- Preserve Windows fractional DPI scales instead of rounding 150/175% up.
+  Fit windows to the current monitor work area, including taskbar/title bar space.
+- Keep Settings Close outside scrolling content and give each page its own
+  scrolling area, so tall pages do not enlarge the whole dialog.
+- Put account Save/Register/Unregister actions near the registration status.
+- Adapt the chat composer and fax icons to the smaller phone display.
+- Add UI checks at 100%, 125%, 150%, 175%, 200%, 250% and 300% scaling to Linux/Windows CI.
+
 ## 0.15.0 — 2026-11-17
 
 - Add Settings → Remote API, with token authentication, client IP/CIDR controls,

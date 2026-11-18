@@ -1,4 +1,6 @@
 #include "mainwindow.h"
+#include "windowlayout.h"
+#include <QScrollArea>
 #include "remotecontrol.h"
 #include "remotecontrolwidget.h"
 #include <QBuffer>
@@ -44,15 +46,17 @@
 
 namespace stel {
 MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(parent),store_(directory),engine_(this) {
+    compactApplicationFont(*qApp);
     setLayoutDirection(Qt::LeftToRight);
-    setWindowTitle("Stel • Softphone");setWindowFlag(Qt::FramelessWindowHint);setMinimumSize(1000,750);resize(1200,900);
+    setWindowTitle("Stel • Softphone");setWindowFlag(Qt::FramelessWindowHint);setMinimumSize(uiPixels(600),uiPixels(450));resize(840,630);
+    auto compactFont=font();compactFont.setPixelSize(uiPixels(12));setFont(compactFont);
     setWindowIcon(applicationIcon());
     desk_=new DeskPhone;setCentralWidget(desk_);
     accountBox_=desk_->account;target_=desk_->target;calls_=desk_->calls;detail_=desk_->detail;status_=desk_->status;openCall_=desk_->openCall;tabs_=desk_->pages;
     auto *settingsButton=desk_->settings;
     auto *dnd=new QCheckBox("Do not disturb",this);dnd->setObjectName("globalDnd");dnd->hide();
     chat_=new ChatWidget(engine_,store_);chat_->setDeskMode();tabs_->addTab(chat_,"Messages");
-    auto *faxPage=new QWidget;auto *faxLayout=new QVBoxLayout(faxPage);faxLayout->setContentsMargins(18,10,18,10);auto *faxTitle=new QLabel("Fax");faxTitle->setStyleSheet("color:white;font-size:28px;font-weight:bold;");faxLayout->addWidget(faxTitle);auto *faxHint=new QLabel("PDF, text and images · standard A4 pages\nT.38 or G.711 pass-through, chosen for each fax.");faxHint->setStyleSheet("color:#d6e9ff;font-size:15px;");faxHint->setWordWrap(true);faxLayout->addWidget(faxHint);auto *faxSummary=new QLabel;faxSummary->setObjectName("deskFaxSummary");faxSummary->setStyleSheet("color:#e9f4ff;font-size:16px;");faxLayout->addWidget(faxSummary);auto *faxActions=new QHBoxLayout;for(int n=0;n<3;++n){auto *button=new QPushButton(QStringList{"Send Fax","Inbox","Outbox"}[n]);button->setStyleSheet("background:#164c81;color:white;border:1px solid #479de7;padding:8px;");faxActions->addWidget(button);connect(button,&QPushButton::clicked,this,[this,n]{if(auto *tab=fax_->findChild<QPushButton*>("faxDeskTab"+QString::number(n)))tab->click();});}faxLayout->addLayout(faxActions);tabs_->addTab(faxPage,"Fax");tabs_->addTab(createContacts(),"Contacts");tabs_->addTab(createHistory(),"Recent calls");
+    auto *faxPage=new QWidget;auto *faxLayout=new QVBoxLayout(faxPage);faxLayout->setContentsMargins(uiPixels(18),uiPixels(10),uiPixels(18),uiPixels(10));auto *faxTitle=new QLabel("Fax");faxTitle->setStyleSheet(uiStyleSheet("color:white;font-size:28px;font-weight:bold;"));faxLayout->addWidget(faxTitle);auto *faxHint=new QLabel("PDF, text and images · standard A4 pages\nT.38 or G.711 pass-through, chosen for each fax.");faxHint->setStyleSheet(uiStyleSheet("color:#d6e9ff;font-size:15px;"));faxHint->setWordWrap(true);faxLayout->addWidget(faxHint);auto *faxSummary=new QLabel;faxSummary->setObjectName("deskFaxSummary");faxSummary->setStyleSheet(uiStyleSheet("color:#e9f4ff;font-size:16px;"));faxLayout->addWidget(faxSummary);auto *faxActions=new QHBoxLayout;for(int n=0;n<3;++n){auto *button=new QPushButton(QStringList{"Send Fax","Inbox","Outbox"}[n]);button->setStyleSheet(uiStyleSheet("background:#164c81;color:white;border:1px solid #479de7;padding:8px;"));faxActions->addWidget(button);connect(button,&QPushButton::clicked,this,[this,n]{if(auto *tab=fax_->findChild<QPushButton*>("faxDeskTab"+QString::number(n)))tab->click();});}faxLayout->addLayout(faxActions);tabs_->addTab(faxPage,"Fax");tabs_->addTab(createContacts(),"Contacts");tabs_->addTab(createHistory(),"Recent calls");
     fax_=new FaxWidget(engine_,desk_,true);desk_->dockFax(fax_);
     connect(fax_,&FaxWidget::contactRequested,this,[this]{const auto contacts=store_.contacts();QStringList names;for(const auto &contact:contacts)names<<contact["name"].toString()+"  ·  "+contact["uri"].toString();if(names.isEmpty()){tabs_->setCurrentIndex(3);return;}bool ok=false;const auto name=QInputDialog::getItem(this,"Fax contact","Send fax to",names,0,false,&ok);if(ok)fax_->setDestination(contacts[names.indexOf(name)]["uri"].toString());});
     connect(chat_,&ChatWidget::settingsRequested,this,&MainWindow::showSettings);
@@ -60,7 +64,7 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
     connect(chat_,&ChatWidget::unreadCountChanged,this,updateUnread);
     connect(tabs_,&QTabWidget::currentChanged,this,[this](int index){if(index==2){fax_->setFocus();desk_->target->clearFocus();}});
     log_=new QPlainTextEdit;log_->setReadOnly(true);log_->setMaximumBlockCount(150);log_->setPlaceholderText("Registration and call events");
-    auto *events=new QDialog(this);events->setWindowTitle("Stel • Events");events->resize(800,420);auto *eventsLayout=new QVBoxLayout(events);eventsLayout->addWidget(log_);
+    auto *events=new QDialog(this);events->setWindowTitle("Stel • Events");events->setObjectName("eventsDialog");events->resize(640,340);auto *eventsLayout=new QVBoxLayout(events);eventsLayout->addWidget(log_);manageWindowLayout(events,{640,340},{320,200});
     auto *eventShortcut=new QShortcut(QKeySequence("Ctrl+L"),this);connect(eventShortcut,&QShortcut::activated,events,&QDialog::show);
     connect(target_,&QLineEdit::returnPressed,this,[this]{dial(false);});
     connect(calls_,&QListWidget::currentRowChanged,this,[this]{updateControls();});
@@ -131,10 +135,10 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
     connect(remoteControl_,&RemoteControlServer::resourceChanged,this,&MainWindow::reloadApiConfiguration);
     if(ready_&&settingsValid_){QString error;if(!remoteControl_->configure(prefs_.remoteControl,&error))appendLog("Remote API: "+error);}
     settingsDialog_=new QDialog(this);settingsDialog_->setObjectName("settingsDialog");settingsDialog_->setWindowTitle("Stel • Settings");
-    settingsDialog_->setWindowFlag(Qt::WindowContextHelpButtonHint,false);settingsDialog_->resize(1080,850);
-    auto *settingsLayout=new QVBoxLayout(settingsDialog_);settingsLayout->setContentsMargins(10,10,10,10);settingsLayout->addWidget(createSettings());settingsLayout->addWidget(dnd);dnd->show();
+    settingsDialog_->setWindowFlag(Qt::WindowContextHelpButtonHint,false);settingsDialog_->resize(840,600);
+    auto *settingsLayout=new QVBoxLayout(settingsDialog_);settingsLayout->setContentsMargins(uiPixels(7),uiPixels(7),uiPixels(7),uiPixels(7));settingsLayout->setSpacing(uiPixels(4));settingsScroll_=new QScrollArea;settingsScroll_->setObjectName("settingsScroll");settingsScroll_->setFrameShape(QFrame::NoFrame);settingsScroll_->setWidgetResizable(true);settingsScroll_->setWidget(createSettings());settingsLayout->addWidget(settingsScroll_,1);settingsLayout->addWidget(dnd);dnd->show();
     auto *eventsButton=new QPushButton("Call and registration events…");settingsLayout->addWidget(eventsButton);connect(eventsButton,&QPushButton::clicked,events,&QDialog::show);
-    auto *settingsButtons=new QDialogButtonBox(QDialogButtonBox::Close);settingsButtons->setObjectName("settingsButtons");settingsLayout->addWidget(settingsButtons);
+    auto *settingsButtons=new QDialogButtonBox(QDialogButtonBox::Close);settingsButtons->setObjectName("settingsButtons");settingsLayout->addWidget(settingsButtons);manageWindowLayout(settingsDialog_,{840,600},{420,320});
     connect(settingsButtons,&QDialogButtonBox::rejected,settingsDialog_,&QDialog::reject);
     connect(settingsDialog_,&QDialog::finished,this,[this]{if(!closing_){if(isMinimized())showNormal();else show();raise();activateWindow();}});
     rebuildAccounts();refreshContacts();refreshHistory();refreshExpansion();
@@ -143,28 +147,30 @@ MainWindow::MainWindow(const QString &directory,QWidget *parent):QMainWindow(par
         connect(tray_,&QSystemTrayIcon::activated,this,[this](QSystemTrayIcon::ActivationReason){showNormal();raise();activateWindow();});
     }
     auto *timer=new QTimer(this);timer->setInterval(1000);connect(timer,&QTimer::timeout,this,[this]{for(const auto &i:engine_.calls())updateCall(i);});timer->start();
+    manageWindowLayout(this,{840,630},{600,450},true);
     updateControls();statusBar()->hide();statusBar()->showMessage(ready_?"liblinphone "+QString::fromUtf8(linphone_core_get_version())+"  •  SIP UDP / TCP / TLS":"Engine failed — see events");
-    setStyleSheet(R"(
+    setStyleSheet(uiStyleSheet(R"(
         QMainWindow, QDialog { background:#e1e5eb; color:#213344; }
         QWidget { font-family:'DejaVu Sans','Segoe UI'; }
+        QLineEdit, QComboBox, QSpinBox { height:14px; }
         QLabel#brand { font-size:34px; font-weight:700; letter-spacing:-2px; }
         QLabel#muted { color:#6d7d8c; font-size:10px; letter-spacing:2px; }
         QLabel#accountStatus { color:#086bb2; background:#ddebf8; border-radius:6px; padding:10px; }
-        QPushButton { background:#fff; color:#213344; border:1px solid #d4dde4; border-radius:6px; padding:8px 12px; }
+        QPushButton { background:#fff; color:#213344; border:1px solid #d4dde4; border-radius:6px; padding:4px 8px; }
         QPushButton:hover { background:#e7f1fa; border-color:#168fdf; }
         QPushButton:disabled { color:#a5afb8; background:#edf0f3; }
         QPushButton#primary { background:#087bd2; color:white; border:0; font-weight:600; }
         QPushButton#danger { background:#bd4052; color:white; border:0; }
         QPushButton#primary:disabled, QPushButton#danger:disabled { color:#a5afb8; background:#edf0f3; border:1px solid #d4dde4; }
         QPushButton#key { font-size:22px; font-weight:500; min-height:36px; }
-        QLineEdit, QComboBox, QSpinBox { background:white; border:1px solid #ced9e1; border-radius:5px; padding:8px; selection-background-color:#087bd2; }
+        QLineEdit, QComboBox, QSpinBox { background:white; border:1px solid #ced9e1; border-radius:5px; padding:3px 5px; selection-background-color:#087bd2; }
         QListWidget, QPlainTextEdit { background:white; border:1px solid #d7e0e7; border-radius:5px; padding:5px; }
-        QListWidget::item { padding:9px; border-bottom:1px solid #edf1f4; }
+        QListWidget::item { padding:5px; border-bottom:1px solid #edf1f4; }
         QListWidget::item:selected { background:#dcecfb; color:#164a79; }
         QTabWidget::pane { border:1px solid #d7e0e7; background:#fafcfd; border-radius:5px; }
-        QTabBar::tab { padding:10px 22px; color:#667888; }
+        QTabBar::tab { padding:5px 9px; color:#667888; }
         QTabBar::tab:selected { color:#086bb2; border-bottom:3px solid #087bd2; }
-    )");
+    )"));
 }
 QWidget *MainWindow::createContacts() {
     auto *page=new QWidget;auto *layout=new QVBoxLayout(page);contacts_=new QListWidget;layout->addWidget(contacts_,1);auto *row=new QHBoxLayout;auto *add=new QPushButton("+ Add contact");auto *remove=new QPushButton("Remove");auto *call=new QPushButton("Call selected");row->addWidget(add);row->addWidget(remove);row->addStretch();row->addWidget(call);layout->addLayout(row);
@@ -181,7 +187,7 @@ QWidget *MainWindow::createSettings() {
     settings_=new SettingsWidget(engine_,accounts_,prefs_,store_,settingsValid_,settingsDialog_);
     connect(settings_,&SettingsWidget::accountsChanged,this,&MainWindow::rebuildAccounts);
     connect(settings_,&SettingsWidget::expansionChanged,this,&MainWindow::refreshExpansion);
-    if(remoteControl_){auto *pages=settings_->findChild<QTabWidget*>("settingsPages");pages->addTab(new RemoteControlWidget(*remoteControl_,accounts_,prefs_,store_,settingsValid_,settings_),navigationIcon(NavigationIcon::Network),"Remote API");styleNavigationTabs(pages,NavigationLevel::Settings);}
+    if(remoteControl_){auto *pages=settings_->findChild<QTabWidget*>("settingsPages");auto *page=new QScrollArea;page->setWidgetResizable(true);page->setFrameShape(QFrame::NoFrame);page->setWidget(new RemoteControlWidget(*remoteControl_,accounts_,prefs_,store_,settingsValid_,settings_));pages->addTab(page,navigationIcon(NavigationIcon::Network),"Remote API");styleNavigationTabs(pages,NavigationLevel::Settings);}
     return settings_;
 }
 void MainWindow::showSettings(){if(closing_)return;settings_->openAccounts();settingsDialog_->show();settingsDialog_->raise();settingsDialog_->activateWindow();}
@@ -227,7 +233,7 @@ MainWindow::~MainWindow() {
 }
 void MainWindow::reloadApiConfiguration(const QString &resource){
     if(resource=="configuration"){rebuildAccounts();refreshExpansion();
-        if(settingsDialog_&&!settingsDialog_->isVisible()){auto *old=settings_;auto *layout=settingsDialog_->layout();const int index=layout->indexOf(old);layout->removeWidget(old);static_cast<QVBoxLayout*>(layout)->insertWidget(index,createSettings());old->deleteLater();}
+        if(settingsDialog_&&!settingsDialog_->isVisible()){auto *old=settingsScroll_->takeWidget();settingsScroll_->setWidget(createSettings());old->deleteLater();}
     }
     if(resource=="contacts")refreshContacts();
     if(resource=="dnd"||resource=="configuration")if(auto *dnd=findChild<QCheckBox*>("globalDnd")){const QSignalBlocker blocker(dnd);dnd->setChecked(prefs_.dnd);}
@@ -293,7 +299,7 @@ void MainWindow::updateCall(const CallInfo &i){
             if(dialog)dialog->hide();
             accountBox_->setCurrentIndex(accountBox_->findData(accountId));tabs_->setCurrentIndex(0);calls_->clearSelection();calls_->setCurrentRow(-1);showNormal();raise();activateWindow();updateControls();target_->clear();target_->setFocus();
         });
-        const auto screen=QApplication::primaryScreen();if(screen){const auto area=screen->availableGeometry();const int offset=24*((callDialogs_.size()-1)%5);dialog->move(qBound(area.left(),frameGeometry().center().x()-dialog->width()/2+offset,area.right()-dialog->width()),qBound(area.top(),area.center().y()-dialog->height()/2+offset,area.bottom()-dialog->height()));}
+        const auto screen=this->screen();if(screen){const auto area=screen->availableGeometry();const int offset=24*((callDialogs_.size()-1)%5);dialog->move(qBound(area.left(),frameGeometry().center().x()-dialog->width()/2+offset,area.right()-dialog->width()),qBound(area.top(),area.center().y()-dialog->height()/2+offset,area.bottom()-dialog->height()));}
     }
     if(dialog)dialog->updateCall(i,accountDetails,transport);
     if(first){bool faxCall=false;for(const auto &fax:engine_.faxes())faxCall|=fax.callId==i.id;if(i.incoming||!faxCall)tabs_->setCurrentIndex(0);showNormal();raise();activateWindow();}

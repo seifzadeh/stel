@@ -6,7 +6,7 @@
 با Stel اکانت‌های PBX خودت را روی دسکتاپ داشته باش؛ تماس صوتی و تصویری بگیر،
 پیام رد و بدل کن و فکس بفرست یا دریافت کن. برنامه با Qt و C++ ساخته شده است.
 
-![صفحهٔ اصلی Stel](website/assets/screenshots/v0.15.0/main-window.png)
+![صفحهٔ اصلی Stel](website/assets/screenshots/v0.15.1/main-window.png)
 
 [تصاویر همهٔ صفحه‌ها](docs/SCREENSHOTS.md#captured-pages) · [گالری سایت](https://seifzadeh.github.io/stel/?lang=fa#screenshots)
 
@@ -48,6 +48,8 @@
    و SRTP را می‌توانی جداگانه در تنظیمات اکانت انتخاب کنی.
 
 چند ابزار دیگر:
+
+- [رابط با نصف اندازه](docs/DISPLAY.md)؛ پنجره، نوشته و دکمه‌های کوچک‌تر، با پشتیبانی از Scale ویندوز.
 
 - [کنترل از راه دور با API](docs/API.md): فرمان‌های ییلینک و API با خروجی JSON برای تماس، اکانت، پیام، فکس، BLF و وضعیت برنامه؛ فعال‌سازی در Settings → Remote API.
 

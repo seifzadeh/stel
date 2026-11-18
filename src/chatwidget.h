@@ -5,6 +5,7 @@ class QComboBox;
 class QLineEdit;
 class QListWidget;
 class QPlainTextEdit;
+class QResizeEvent;
 class QScrollArea;
 class QLabel;
 class QPushButton;
@@ -24,6 +25,7 @@ signals:
     void settingsRequested();
 protected:
     void showEvent(QShowEvent *) override;
+    void resizeEvent(QResizeEvent *) override;
 private:
     SipEngine &engine_;
     Store &store_;

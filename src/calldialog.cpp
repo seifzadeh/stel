@@ -1,4 +1,5 @@
 #include "calldialog.h"
+#include "windowlayout.h"
 #include "branding.h"
 #include "videoview.h"
 #include "inlinecallhost.h"
@@ -57,39 +58,38 @@ static QString mediaEncryption(QString value) {
 CallDialog::CallDialog(SipEngine &engine,const CallInfo &info,QWidget *parent):QDialog(parent),engine_(engine),info_(info) {
     setObjectName("callDialog");setProperty("callId",info.id);setWindowIcon(applicationIcon());setModal(false);
     setAttribute(Qt::WA_QuitOnClose,false);setWindowFlag(Qt::WindowContextHelpButtonHint,false);setWindowFlag(Qt::WindowMinimizeButtonHint,true);
-    const int available=QApplication::primaryScreen()?QApplication::primaryScreen()->availableGeometry().height()-60:740;
-    setMinimumSize(480,qMin(580,qMax(480,available)));resize(550,qMin(740,qMax(480,available)));
-    auto *outer=new QVBoxLayout(this);outer->setContentsMargins(12,12,12,12);
+    resize(460,580);auto compactFont=font();compactFont.setPixelSize(uiPixels(12));setFont(compactFont);
+    auto *outer=new QVBoxLayout(this);outer->setContentsMargins(uiPixels(12),uiPixels(12),uiPixels(12),uiPixels(12));
     auto *scroll=new QScrollArea;scroll->setWidgetResizable(true);scroll->setFrameShape(QFrame::NoFrame);outer->addWidget(scroll,1);
-    auto *body=new QWidget;body_=body;body->setObjectName("callBody");scroll->setWidget(body);auto *layout=new QVBoxLayout(body);bodyLayout_=layout;layout->setContentsMargins(8,8,8,8);layout->setSpacing(12);
+    auto *body=new QWidget;body_=body;body->setObjectName("callBody");scroll->setWidget(body);auto *layout=new QVBoxLayout(body);bodyLayout_=layout;layout->setContentsMargins(uiPixels(8),uiPixels(8),uiPixels(8),uiPixels(8));layout->setSpacing(uiPixels(12));
     auto *top=new QHBoxLayout;auto *logo=new QLabel;logo->setPixmap(applicationIcon().pixmap(28,28));top->addWidget(logo);
-    direction_=plainLabel("callDirection");top->addWidget(direction_);top->addStretch();duration_=plainLabel("callDuration");duration_->setStyleSheet("font-size:20px;font-weight:600;color:#132c3b;");top->addWidget(duration_);layout->addLayout(top);
-    auto *card=new QFrame;card->setObjectName("callIdentity");auto *identity=new QVBoxLayout(card);identity->setSpacing(5);
-    name_=plainLabel("callerName");name_->setStyleSheet("font-size:24px;font-weight:700;color:#132c3b;");identity->addWidget(name_);
-    address_=plainLabel("callerAddress");address_->setTextInteractionFlags(Qt::TextSelectableByMouse);address_->setStyleSheet("color:#607688;");identity->addWidget(address_);
+    direction_=plainLabel("callDirection");top->addWidget(direction_);top->addStretch();duration_=plainLabel("callDuration");duration_->setStyleSheet(uiStyleSheet("font-size:20px;font-weight:600;color:#132c3b;"));top->addWidget(duration_);layout->addLayout(top);
+    auto *card=new QFrame;card->setObjectName("callIdentity");auto *identity=new QVBoxLayout(card);identity->setSpacing(uiPixels(5));
+    name_=plainLabel("callerName");name_->setStyleSheet(uiStyleSheet("font-size:20px;font-weight:700;color:#132c3b;"));identity->addWidget(name_);
+    address_=plainLabel("callerAddress");address_->setTextInteractionFlags(Qt::TextSelectableByMouse);address_->setStyleSheet(uiStyleSheet("color:#607688;"));identity->addWidget(address_);
     account_=plainLabel("callAccountDetails");identity->addWidget(account_);status_=plainLabel("callStatus");identity->addWidget(status_);layout->addWidget(card);
     auto *primary=new QHBoxLayout;
-    auto button=[&](const QString &text,const QString &object){auto *b=new QPushButton(text);b->setObjectName(object);b->setAutoDefault(false);b->setMinimumHeight(34);return b;};
+    auto button=[&](const QString &text,const QString &object){auto *b=new QPushButton(text);b->setObjectName(object);b->setAutoDefault(false);b->setMinimumHeight(uiPixels(26));return b;};
     answer_=button("Answer","callAnswer");answerVideo_=button("Answer with video","callAnswerVideo");hangup_=button("Hang up","callHangup");ringTransfer_=button("Transfer","callIncomingTransfer");
     for(auto *b:{answer_,answerVideo_,hangup_,ringTransfer_})primary->addWidget(b);
     fax_=button("Fax","callFax");primary->addWidget(fax_);connect(fax_,&QPushButton::clicked,this,[this]{emit faxRequested(info_.id);});
     layout->addLayout(primary);
     mediaTabs_=new QTabWidget;mediaTabs_->setObjectName("callMediaTabs");layout->addWidget(mediaTabs_);
-    auto *keypad=new QWidget;auto *keyLayout=new QVBoxLayout(keypad);keyLayout->setContentsMargins(10,10,10,10);digits_=new QLineEdit;digits_->setObjectName("callDtmfDisplay");digits_->setReadOnly(true);digits_->setPlaceholderText("DTMF sent on this call");digits_->setMaxLength(40);keyLayout->addWidget(digits_);
-    auto *grid=new QGridLayout;grid->setSpacing(6);const QString keys="123456789*0#";
-    for(int n=0;n<keys.size();++n){const auto digit=keys[n];auto *b=button(QString(digit),"callDtmf_"+(digit=='*'?"star":digit=='#'?"hash":QString(digit)));b->setProperty("digit",QString(digit));b->setMinimumHeight(30);b->setMaximumHeight(36);b->setStyleSheet("font-size:21px;font-weight:500;padding:2px 8px;");grid->addWidget(b,n/3,n%3);keypad_<<b;connect(b,&QPushButton::clicked,this,[this,digit]{sendDigit(digit);});}
+    auto *keypad=new QWidget;auto *keyLayout=new QVBoxLayout(keypad);keyLayout->setContentsMargins(uiPixels(10),uiPixels(10),uiPixels(10),uiPixels(10));digits_=new QLineEdit;digits_->setObjectName("callDtmfDisplay");digits_->setReadOnly(true);digits_->setPlaceholderText("DTMF sent on this call");digits_->setMaxLength(40);keyLayout->addWidget(digits_);
+    auto *grid=new QGridLayout;grid->setSpacing(uiPixels(6));const QString keys="123456789*0#";
+    for(int n=0;n<keys.size();++n){const auto digit=keys[n];auto *b=button(QString(digit),"callDtmf_"+(digit=='*'?"star":digit=='#'?"hash":QString(digit)));b->setProperty("digit",QString(digit));b->setMinimumHeight(uiPixels(24));b->setMaximumHeight(uiPixels(30));b->setStyleSheet(uiStyleSheet("font-size:18px;font-weight:500;padding:2px 8px;"));grid->addWidget(b,n/3,n%3);keypad_<<b;connect(b,&QPushButton::clicked,this,[this,digit]{sendDigit(digit);});}
     keyLayout->addLayout(grid);mediaTabs_->addTab(keypad,"Keypad");
-    auto *video=new QWidget;auto *videoLayout=new QVBoxLayout(video);remoteVideo_=new VideoView;remoteVideo_->setObjectName("callRemoteVideo");remoteVideo_->setMinimumSize(300,180);videoLayout->addWidget(remoteVideo_,1);
-    previewVideo_=new VideoView;previewVideo_->setObjectName("callPreviewVideo");previewVideo_->setMinimumSize(120,80);previewVideo_->setMaximumSize(150,90);videoLayout->addWidget(previewVideo_,0,Qt::AlignRight);mediaTabs_->addTab(video,"Video");
+    auto *video=new QWidget;auto *videoLayout=new QVBoxLayout(video);remoteVideo_=new VideoView;remoteVideo_->setObjectName("callRemoteVideo");remoteVideo_->setMinimumSize(uiPixels(240),uiPixels(135));videoLayout->addWidget(remoteVideo_,1);
+    previewVideo_=new VideoView;previewVideo_->setObjectName("callPreviewVideo");previewVideo_->setMinimumSize(uiPixels(96),uiPixels(54));previewVideo_->setMaximumSize(uiPixels(120),uiPixels(70));videoLayout->addWidget(previewVideo_,0,Qt::AlignRight);mediaTabs_->addTab(video,"Video");
     auto *details=new QWidget;detailsPage_=details;auto *detailsLayout=new QVBoxLayout(details);mediaDetails_=plainLabel("callMediaDetails");mediaDetails_->setTextInteractionFlags(Qt::TextSelectableByMouse);detailsLayout->addWidget(mediaDetails_);detailsLayout->addStretch();mediaTabs_->addTab(details,"Details");
-    auto *controls=new QGridLayout;controls->setSpacing(6);
+    auto *controls=new QGridLayout;controls->setSpacing(uiPixels(6));
     hold_=button("Hold","callHold");mute_=button("Mute mic","callMute");mute_->setCheckable(true);record_=button("Record","callRecord");record_->setCheckable(true);
     transfer_=button("Transfer","callTransfer");forward_=button("Forward","callForward");attended_=button("Attended transfer","callAttendedTransfer");conference_=button("Conference","callConference");addCall_=button("Add call","callAddCall");
     const QList<QPushButton*> actions{hold_,mute_,record_,transfer_,forward_,attended_,conference_,addCall_};for(int n=0;n<actions.size();++n)controls->addWidget(actions[n],n/3,n%3);layout->addLayout(controls);
     routePanel_=new QGroupBox;routePanel_->setObjectName("callRoutePanel");auto *route=new QVBoxLayout(routePanel_);routeHint_=plainLabel("callRouteHint");route->addWidget(routeHint_);routeTarget_=new QLineEdit;routeTarget_->setObjectName("callRouteTarget");routeTarget_->setPlaceholderText("Extension or SIP address");route->addWidget(routeTarget_);auto *routeButtons=new QHBoxLayout;routeApply_=button("Transfer","callRouteApply");auto *cancelRoute=button("Cancel","callRouteCancel");routeButtons->addWidget(routeApply_);routeButtons->addWidget(cancelRoute);route->addLayout(routeButtons);layout->addWidget(routePanel_);routePanel_->hide();
     peerPanel_=new QGroupBox;peerPanel_->setObjectName("callPeerPanel");auto *peer=new QVBoxLayout(peerPanel_);peerHint_=plainLabel("callPeerHint");peer->addWidget(peerHint_);peerChoice_=new QComboBox;peerChoice_->setObjectName("callPeerChoice");peer->addWidget(peerChoice_);auto *peerButtons=new QHBoxLayout;peerApply_=button("Apply","callPeerApply");auto *cancelPeer=button("Cancel","callPeerCancel");peerButtons->addWidget(peerApply_);peerButtons->addWidget(cancelPeer);peer->addLayout(peerButtons);layout->addWidget(peerPanel_);peerPanel_->hide();
-    message_=plainLabel("callActionResult");message_->setStyleSheet("color:#b33748;");message_->hide();layout->addWidget(message_);layout->addStretch();
-    auto *footer=new QHBoxLayout;auto *hint=plainLabel();hint->setText("Closing an active call asks before disconnecting.");hint->setStyleSheet("font-size:10px;color:#607688;");footer->addWidget(hint,1);dock_=button("Return to phone","callDock");dock_->hide();footer->addWidget(dock_);connect(dock_,&QPushButton::clicked,this,[this]{hide();emit dockRequested();});auto *closeButton=button("Close window","callClose");footer->addWidget(closeButton);outer->addLayout(footer);
+    message_=plainLabel("callActionResult");message_->setStyleSheet(uiStyleSheet("color:#b33748;"));message_->hide();layout->addWidget(message_);layout->addStretch();
+    auto *footer=new QHBoxLayout;auto *hint=plainLabel();hint->setText("Closing an active call asks before disconnecting.");hint->setStyleSheet(uiStyleSheet("font-size:10px;color:#607688;"));hint->setWordWrap(true);footer->addWidget(hint,1);dock_=button("Return to phone","callDock");dock_->hide();footer->addWidget(dock_);connect(dock_,&QPushButton::clicked,this,[this]{hide();emit dockRequested();});auto *closeButton=button("Close window","callClose");footer->addWidget(closeButton);outer->addLayout(footer);
     endTimer_=new QTimer(this);endTimer_->setSingleShot(true);connect(endTimer_,&QTimer::timeout,this,[this]{close();});
     connect(closeButton,&QPushButton::clicked,this,&QDialog::close);
     connect(answer_,&QPushButton::clicked,this,[this]{check(engine_.answer(info_.id,false));});connect(answerVideo_,&QPushButton::clicked,this,[this]{check(engine_.answer(info_.id,true));});
@@ -100,12 +100,13 @@ CallDialog::CallDialog(SipEngine &engine,const CallInfo &info,QWidget *parent):Q
     connect(transfer_,&QPushButton::clicked,this,[this,scroll]{openRoute(RouteAction::Transfer);QTimer::singleShot(0,this,[this,scroll]{if(!inlineHost_)scroll->ensureWidgetVisible(routePanel_);});});
     connect(ringTransfer_,&QPushButton::clicked,this,[this,scroll]{openRoute(RouteAction::Transfer);QTimer::singleShot(0,this,[this,scroll]{if(!inlineHost_)scroll->ensureWidgetVisible(routePanel_);});});
     connect(forward_,&QPushButton::clicked,this,[this,scroll]{openRoute(RouteAction::Forward);QTimer::singleShot(0,this,[this,scroll]{if(!inlineHost_)scroll->ensureWidgetVisible(routePanel_);});});
+    manageWindowLayout(this,{460,580},{360,300});
     connect(routeApply_,&QPushButton::clicked,this,&CallDialog::applyRoute);connect(routeTarget_,&QLineEdit::returnPressed,this,&CallDialog::applyRoute);connect(cancelRoute,&QPushButton::clicked,this,&CallDialog::closeInlinePanels);
     connect(attended_,&QPushButton::clicked,this,[this,scroll]{openPeers(PeerAction::Attended);QTimer::singleShot(0,this,[this,scroll]{if(!inlineHost_)scroll->ensureWidgetVisible(peerPanel_);});});
     connect(conference_,&QPushButton::clicked,this,[this,scroll]{openPeers(PeerAction::Conference);QTimer::singleShot(0,this,[this,scroll]{if(!inlineHost_)scroll->ensureWidgetVisible(peerPanel_);});});
     connect(peerApply_,&QPushButton::clicked,this,&CallDialog::applyPeer);connect(cancelPeer,&QPushButton::clicked,this,&CallDialog::closeInlinePanels);connect(addCall_,&QPushButton::clicked,this,&CallDialog::requestNewCall);
     connect(mediaTabs_,&QTabWidget::currentChanged,this,[this](int tab){if(tab==1)bindVideo();});
-    setStyleSheet("QWidget#callBody{background:#e1e5eb;} QFrame#callIdentity{background:white;border:1px solid #d7e0e7;border-radius:8px;} QPushButton#callAnswer,QPushButton#callAnswerVideo{background:#168237;color:white;border:0;} QPushButton#callHangup{background:#bd4052;color:white;border:0;} QPushButton:checked{background:#dcecfb;border-color:#087bd2;color:#164a79;} QLabel#callDirection{color:#607688;font-size:11px;font-weight:600;}");
+    setStyleSheet(uiStyleSheet("QWidget#callBody{background:#e1e5eb;} QFrame#callIdentity{background:white;border:1px solid #d7e0e7;border-radius:8px;} QPushButton#callAnswer,QPushButton#callAnswerVideo{background:#168237;color:white;border:0;} QPushButton#callHangup{background:#bd4052;color:white;border:0;} QPushButton:checked{background:#dcecfb;border-color:#087bd2;color:#164a79;} QLabel#callDirection{color:#607688;font-size:11px;font-weight:600;}"));
     for(const auto &fax:engine_.faxes())if(fax.callId==info.id)faxInfo_=fax;
     connect(&engine_,&SipEngine::faxChanged,this,[this](const FaxInfo &fax){if(fax.callId==info_.id){faxInfo_=fax;updateCall(info_,accountDetails_,transport_);}});
     updateCall(info,info.accountName,{});
@@ -171,7 +172,7 @@ void CallDialog::updateCall(const CallInfo &info,const QString &accountDetails,c
     setWindowTitle((info.paging?"Page from":incoming?"Incoming call":info.incoming?"Call from":"Call to")+QString(" · ")+peer+" · Stel");
     direction_->setText(info.paging?(info.pagingAutoAnswered?"PAGING / INTERCOM · AUTO ANSWERED":"INCOMING PAGE / INTERCOM"):info.incoming?"INCOMING CALL":"OUTGOING CALL");name_->setText(peer);address_->setText(info.remote);account_->setText("Account: "+accountDetails);
     duration_->setText(QString("%1:%2").arg(info.duration/60,2,10,QChar('0')).arg(info.duration%60,2,10,QChar('0')));
-    status_->setText(!ended&&info.inConference?"Conference · "+QString::number(info.conferenceParticipants)+" participants":callStateLabel(state));status_->setStyleSheet("font-weight:600;color:"+QString(state==LinphoneCallError?"#b33748":connected?"#087f74":incoming?"#a16a16":"#526b7c")+";");
+    status_->setText(!ended&&info.inConference?"Conference · "+QString::number(info.conferenceParticipants)+" participants":callStateLabel(state));status_->setStyleSheet(uiStyleSheet("font-weight:600;color:"+QString(state==LinphoneCallError?"#b33748":connected?"#087f74":incoming?"#a16a16":"#526b7c")+";"));
     answer_->setVisible(incoming);answer_->setEnabled(incoming);answerVideo_->setVisible(incoming&&info.video&&!info.paging);answerVideo_->setEnabled(incoming&&info.video&&!info.paging);hangup_->setText(incoming?"Reject":established?"Hang up":ended?"Call ended":"Cancel call");hangup_->setEnabled(!ended);
     ringTransfer_->setVisible(incoming);if(justAnswered)mediaTabs_->setCurrentIndex(0);
     fax_->setVisible(info.incoming&&!ended);fax_->setEnabled(info.incoming&&(incoming||connected||state==LinphoneCallUpdatedByRemote));

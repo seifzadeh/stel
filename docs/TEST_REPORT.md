@@ -1,6 +1,6 @@
 # Stel test reports
 
-Latest feature validation: [0.15.0 — Remote Control API](TEST_REPORT_0.15.0.md).
+Latest feature validation: [0.15.1 — compact windows and DPI scaling](TEST_REPORT_0.15.1.md).
 
 ## Stel 0.6.0 — release-ready repository and About
 

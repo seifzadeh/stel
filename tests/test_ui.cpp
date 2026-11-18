@@ -114,7 +114,8 @@ private slots:
     void aboutShowsReleaseAndCredits() {
         QTemporaryDir tmp;stel::MainWindow window(tmp.path());QVERIFY(window.ready());window.show();window.showSettings();
         auto *pages=window.findChild<QTabWidget*>("settingsPages");QVERIFY(pages);auto *page=window.findChild<QWidget*>("aboutPage");QVERIFY(page);
-        pages->setCurrentWidget(page);QCOMPARE(pages->tabText(pages->currentIndex()),QString("About"));
+        for(int n=0;n<pages->count();++n)if(pages->widget(n)==page||pages->widget(n)->isAncestorOf(page))pages->setCurrentIndex(n);
+        QCOMPARE(pages->tabText(pages->currentIndex()),QString("About"));
         QCOMPARE(page->findChild<QLabel*>("aboutVersion")->text(),QString("Stel ")+STEL_VERSION);
         auto *details=page->findChild<QTextBrowser*>("aboutDetails");QVERIFY(details);const auto text=details->toPlainText();
         for(const auto &credit:{"Mehrdad Seifzadeh","mehrdad.seifzadeh@gmail.com","GNU GPL","AGPL","QtKeychain","Linphone SDK"})QVERIFY(text.contains(credit));

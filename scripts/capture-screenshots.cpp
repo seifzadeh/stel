@@ -1,5 +1,6 @@
 // Capture the production widgets with disposable loopback SIP accounts.
 #include "mainwindow.h"
+#include "windowlayout.h"
 #include "calldialog.h"
 #include "deskphone.h"
 #include "inlinecallhost.h"
@@ -57,7 +58,7 @@ bool running(SipEngine &engine){
 }
 
 int main(int argc,char **argv){
-    QApplication app(argc,argv);app.setApplicationName("Stel");
+    configureUiDpi();QApplication app(argc,argv);compactApplicationFont(app);app.setApplicationName("Stel");
     try{
         require(argc==2,"Usage: stel_screenshots OUTPUT_DIRECTORY");
         QDir output(QString::fromLocal8Bit(argv[1]));require(output.mkpath("."),"Cannot create screenshot directory");
@@ -81,7 +82,7 @@ int main(int argc,char **argv){
         require(store.saveContacts({{{"name","Office"},{"uri","1001"}},
             {{"name",QString::fromUtf8("پشتیبانی / Support")},{"uri","1002"}}}),"Cannot save demo contacts");
         MainWindow window(state.path());require(window.ready(),"Application could not start");
-        window.resize(1448,1086);window.show();auto *engine=child<SipEngine>(window,"");
+        window.show();auto *engine=child<SipEngine>(window,"");
         auto *pages=child<QTabWidget>(window,"mainPages");auto *desk=child<DeskPhone>(window,"");
         waitFor([&]{return pbx.registered("1001")&&pbx.registered("1002");},"Demo accounts did not register");
         QJsonArray images;
@@ -111,7 +112,7 @@ int main(int argc,char **argv){
         waitFor([&]{return running(*engine)&&desk->remoteVideo->property("hasVideoFrame").toBool();},"Video did not render",15000);
         capture(window,"video-call");QTest::mouseClick(desk->remoteVideo,Qt::LeftButton);
         incoming=callDialog(window,true);waitFor([&]{return incoming->isVisible()&&incoming->remoteVideo()->property("hasVideoFrame").toBool();},"Expanded video did not render");
-        incoming->resize(640,820);capture(*incoming,"video-expanded");child<QPushButton>(*incoming,"callDock")->click();require(running(*engine),"Docking ended the video call");hangup();
+        capture(*incoming,"video-expanded");child<QPushButton>(*incoming,"callDock")->click();require(running(*engine),"Docking ended the video call");hangup();
 
         pages->setCurrentIndex(1);auto *chat=child<ChatWidget>(window,"");
         const auto message=[&](int from,const QString &to,const QString &body,int expected){
@@ -140,7 +141,7 @@ int main(int argc,char **argv){
         bool previewCaptured=false;QTimer previewTimer;previewTimer.setInterval(30);
         QObject::connect(&previewTimer,&QTimer::timeout,&window,[&]{
             auto *dialog=window.findChild<QDialog*>("faxPreviewDialog");if(!dialog||!dialog->isVisible())return;
-            previewTimer.stop();dialog->resize(800,1160);QTest::qWait(100);
+            previewTimer.stop();QTest::qWait(100);
             child<QPushButton>(*dialog,"faxPreviewNext")->click();child<QPushButton>(*dialog,"faxPreviewPrevious")->click();
             capture(*dialog,"fax-preview");previewCaptured=true;dialog->reject();
         });
@@ -178,10 +179,10 @@ int main(int argc,char **argv){
         pages->setCurrentIndex(3);capture(window,"contacts");
         pages->setCurrentIndex(4);capture(window,"history");
 
-        window.showSettings();auto *settings=child<QDialog>(window,"settingsDialog");settings->resize(1080,900);
+        window.showSettings();auto *settings=child<QDialog>(window,"settingsDialog");
         auto *settingsPages=child<QTabWidget>(*settings,"settingsPages");
         for(const auto &entry:QList<QPair<int,QString>>{{0,"accounts"},{1,"codecs"},{2,"video-codecs"},{3,"network"},{4,"security"},{5,"expansion"},{6,"about"},{7,"remote-api"}}){
-            settings->resize(1080,entry.first==0||entry.first==6?900:800);settingsPages->setCurrentIndex(entry.first);
+            settingsPages->setCurrentIndex(entry.first);
             if(entry.first==1){
                 auto *codecs=child<QListWidget>(*settings,"audioCodecs");QListWidgetItem *g729=nullptr;
                 for(int n=0;n<codecs->count();++n)if(codecs->item(n)->data(Qt::UserRole).toString().startsWith("g729/"))g729=codecs->item(n);
@@ -191,12 +192,13 @@ int main(int argc,char **argv){
             }
             capture(*settings,entry.second);
         }
-        settingsPages->setCurrentIndex(0);settings->resize(1080,900);
+        settingsPages->setCurrentIndex(0);
         auto *accountPages=child<QTabWidget>(*settings,"accountTabs");
         for(const auto &entry:QList<QPair<int,QString>>{{1,"account-security"},{2,"account-nat"},{3,"account-forwarding"},{4,"account-paging"}}){
             accountPages->setCurrentIndex(entry.first);capture(*settings,entry.second);
         }
         QJsonObject manifest{{"version",QString::fromLatin1(STEL_VERSION)},{"qt",QString::fromLatin1(qVersion())},
+            {"ui_scale",UiScale},
             {"liblinphone",QString::fromUtf8(linphone_core_get_version())},{"platform",QSysInfo::prettyProductName()},
             {"captured_at",QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},
             {"ui_source_commit",qEnvironmentVariable("STEL_SCREENSHOT_REVISION")},

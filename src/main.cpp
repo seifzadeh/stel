@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "branding.h"
+#include "windowlayout.h"
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QDir>
@@ -44,10 +45,9 @@ int main(int argc,char **argv) {
         std::printf("Stel %s\n",STEL_VERSION);return 0;
     }
     portableRuntime();
-#if QT_VERSION < QT_VERSION_CHECK(6,0,0)
-    QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-#endif
+    stel::configureUiDpi();
     QApplication app(argc,argv);app.setOrganizationName("Stel");app.setApplicationName("Stel");app.setApplicationVersion(STEL_VERSION);
+    stel::compactApplicationFont(app);
     app.setWindowIcon(stel::applicationIcon());app.setDesktopFileName("stel");
     QCommandLineParser parser;parser.setApplicationDescription("Compact multi-account SIP softphone powered by liblinphone");parser.addHelpOption();parser.addVersionOption();
     parser.addOption({"config-dir","Use an isolated configuration directory.","path"});
